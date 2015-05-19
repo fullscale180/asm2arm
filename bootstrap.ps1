@@ -27,7 +27,7 @@ if ($asmModule -eq $null -and $armModule -ne $null)
     $azureModulesPath = Join-Path ${env:ProgramFiles(x86)} -ChildPath "Microsoft SDKs\Azure\PowerShell"
     if (Test-Path $azureModulesPath) {
         Import-Module $(Join-Path $azureModulesPath -ChildPath "ResourceManager\AzureResourceManager\AzureResourceManager.psd1")
-        $asmPath = Join-Path $azureModulesPath -ChildPath "ServiceManagement\Azure\Services"
+        $asmPath = Join-Path $azureModulesPath -ChildPath "ServiceManagement\Azure"
         cd $asmPath
         Import-Module $(Join-Path $asmPath -ChildPath "Azure.psd1")
     } else {
