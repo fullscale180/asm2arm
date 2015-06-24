@@ -4,6 +4,7 @@
     Split-Path $Invocation.MyCommand.Path
 }
 
+
 # Trick to load in the Azure module
 $preference = $ErrorActionPreference
 $ErrorActionPreference = "SilentlyContinue"
@@ -35,12 +36,17 @@ if ($asmModule -eq $null -and $armModule -ne $null)
     }
 }
 
-cd $scriptDirectory
-
+Set-ExecutionPolicy -Scope Process Undefined -Force
 if ($(Get-ExecutionPolicy) -eq "Restricted")
 {
- # TODO: inform user to set execution policy? Or create a signed script...
+    # TODO: inform user to set execution policy? Or create a signed script...
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
 }
 
+cd $scriptDirectory
 $modulePath = Join-Path $scriptDirectory "asm2arm.psd1"
+if ($(Get-Module -Name "asm2arm") -ne $null)
+{
+    Remove-Module -Name "asm2arm"
+}
 Import-Module $modulePath
