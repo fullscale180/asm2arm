@@ -188,7 +188,7 @@ function Get-AvailableAddressSpace
     }
 
     $hostRanges = @()
-    $addressSpaces | ForEach-Object {$hostRanges += Get-HostRange $_} | Sort-Object -Property 'NetworkInt'
+    $addressSpaces | ForEach-Object {Get-HostRange $_} | Sort-Object -Property 'NetworkInt' | ForEach-Object {$hostRanges += $_}
 
     $minRange = [uint32]::MinValue
     $firstRangeNetwork = $hostRanges[0].Network.Split('.')
@@ -260,7 +260,7 @@ function Get-HostRange
     $dottedDecimals = $network.Split('.')
     [uint32] $uintNetwork = [uint32]([uint32]$dottedDecimals[0] -shl 24) + [uint32]([uint32]$dottedDecimals[1] -shl 16) + [uint32]([uint32]$dottedDecimals[2] -shl 8) + [uint32]$dottedDecimals[3] 
     
-    $networkMask = (-bnot [uint64]0) -shl (32 - $cidrPrefix)
+    $networkMask = (-bnot [uint32]0) -shl (32 - $cidrPrefix)
     $broadcast = $uintNetwork -bor ((-bnot $networkMask) -band [uint32]::MaxValue) 
 
     $networkRange = @{'Network' = Get-DecimalIp $uintNetwork; 'Broadcast' = Get-DecimalIp $broadcast; `
@@ -300,14 +300,20 @@ function Get-FirstAvailableRange
     $blockSize = 4096
     $rangesCount = [math]::Floor(($End - $Start) / $blockSize)
     $ranges = @()
-    for ($i = 0; $i -lt $rangesCount; $i++)
-    { 
-        $uintNetwork = ($start + ($i * $blockSize))
-        $broadcast = ($start + ($i + 1) * $blockSize -1)
-        $networkRange = @{'Network' = Get-DecimalIp $uintNetwork; 'Broadcast' = Get-DecimalIp $broadcast; `
-        'Hosts' = ($broadcast - $uintNetwork - 1); 'StartHost' = Get-DecimalIp ($uintNetwork + 1); 'EndHost' = Get-DecimalIp($broadcast - 1); `
-        'BroadcastInt' = $broadcast; 'NetworkInt' = $uintNetwork}
-        $ranges += $networkRange
+    if ($rangesCount -gt 0) 
+    {
+        #for ($i = 0; $i -lt $rangesCount; $i++)
+        # Just grab the first range, but leave the above for reference. The potential number of ranges can 
+        # be quite large, so go for this optimization for the small block sizes.
+        for ($i = 0; $i -lt 1; $i++)
+        { 
+            $uintNetwork = ($start + ($i * $blockSize))
+            $broadcast = ($start + ($i + 1) * $blockSize -1)
+            $networkRange = @{'Network' = Get-DecimalIp $uintNetwork; 'Broadcast' = Get-DecimalIp $broadcast; `
+            'Hosts' = ($broadcast - $uintNetwork - 1); 'StartHost' = Get-DecimalIp ($uintNetwork + 1); 'EndHost' = Get-DecimalIp($broadcast - 1); `
+            'BroadcastInt' = $broadcast; 'NetworkInt' = $uintNetwork}
+            $ranges += $networkRange
+        }
     }
 
     $remainingRange = ($End - $Start) % $blockSize
