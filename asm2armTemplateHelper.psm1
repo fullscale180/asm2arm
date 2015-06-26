@@ -1,5 +1,4 @@
-﻿
-function New-ArmTemplateParameter
+﻿function New-ArmTemplateParameter
 {
     Param
     (
@@ -111,15 +110,8 @@ function New-ArmTemplateParameterFile
     Param
     (
         [Hashtable]
-        $ParametersList,
-        [string]
-        $Version = "1.0.0.0"
+        $ParametersList
     )
-
-    $template = @{
-        '$schema' = 'https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#';
-        'contentVersion' = $Version
-    }
 
     $parameters = @{}
     foreach ($key in $parametersList.Keys)
@@ -127,9 +119,7 @@ function New-ArmTemplateParameterFile
         $parameters.Add($key, @{'value' = $ParametersList[$key]})
     }
 
-    $template.Add('parameters', $parameters)
-
-    $templateObject = New-Object -TypeName PSCustomObject $template
+    $templateObject = New-Object -TypeName PSCustomObject $parameters
     return ConvertTo-Json $templateObject -Depth 5
 }
 

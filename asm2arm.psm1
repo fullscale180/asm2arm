@@ -50,7 +50,7 @@ function Add-AzureSMVmToRM
                    ParameterSetName='VM only')]
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
-        [PersistentVm]
+        [Microsoft.WindowsAzure.Commands.ServiceManagement.Model.PersistentVMRoleContext]
         $VM
     )
 
@@ -102,21 +102,15 @@ function Add-AzureSMVmToRM
     }
     
     # Virtual network resource
-    $vnetName = $canonicalSubscriptionName + 'armvnet'
-    
-
-    if ($(AzureResourceManager\Get-AzureVirtualNetwork -Name $vnetName) -eq $null)
+    $vnetName = $asm2armVnetName
+    if ($(AzureResourceManager\Get-AzureVirtualNetwork -Name $vnetName -ErrorAction SilentlyContinue) -eq $null)
     {
         $virtualNetworkAddressSpaces = AzureResourceManager\Get-AzureVirtualNetwork | %{$_.AddressSpace.AddressPrefixes}
         $vnetAddressSpace = Get-AvailableAddressSpace $virtualNetworkAddressSpaces
-        if ($virtualNetworks)
-        {
-            
-        }
-        if ($(AzureResourceManager\Get-AzureVirtualNetwork) -eq $null)
-        {
-            $subnets = @(New-VirtualNetworkSubnet -Name 'default')
-        }
+        $subnetAddressSpace = Get-FirstSubnet -AddressSpace $vnetAddressSpace
+        $subnet = New-VirtualNetworkSubnet -Name $Global:asm2armSubnet -AddressPrefix $subnetAddressSpace
+        $vnetResource = New-VirtualNetworkResource -Name $vnetName -Location '[parameters(''location'')]' -AddressSpacePrefixes @($vnetAddressSpace) -Subnets @($subnet)
+        $resources += $vnetResource
     }
 
     # Compute, VM resource
@@ -136,11 +130,28 @@ function Add-AzureSMVmToRM
     $location= $cloudService.Location
     $actualParameters['location'] = $location
 
-    $armImageReference = Azure\Get-AzureArmImageRef -Location $location -Image $vmImage
+    $armImageReference = Get-AzureArmImageRef -Location $location -Image $vmImage
 
+    $vmName = '{0}_{1}' -f $ServiceName, $Name
+
+    # Public IP Address resource
+    $ipAddressName = '{0}_armpublicip' -f $vmName
+    $armDnsName = '{0}_arm' -f $ServiceName
+    $publicIPAddressResource = New-PublicIpAddressResource -Name $ipAddressName -Location '[parameters(''location'')]' `
+        -AllocationMethod 'Dynamic' -DnsName $armDnsName
+    $resources += $publicIPAddressResource
+    
+    # NIC resource
+    $nicName = '{0}_nic' -f $vmName
+    $subnetRef = '[resourceId(''Microsoft.Network/virtualNetworks'',''{0}'')]/subnets/{1}' -f $vnetName, $Global:asm2armSubnet
+    $ipAddressDependency = 'Microsoft.Network/publicIPAddresses/{0}' -f $ipAddressName
+    $vnetDependency = 'Microsoft.Network/virtualNetworks/{0}' -f $vnetName
+    $dependencies = @( $ipAddressDependency, $vnetDependency)
+    $nicResource = New-NetworkInterfaceResource -Name $nicName -Location '[parameters(''location'')]' `
+        -PublicIpAddressName $ipAddressName -SubnetReference $subnetRef -Dependecies $dependencies
+    $resources += $nicResource
 
     $parameters = New-Object -TypeName PSCustomObject $parametersObject
-
     
     $template = New-ArmTemplate -Parameters $parameters -Resources $resources
     $templateFileName =  [IO.Path]::GetTempFileName()
@@ -148,13 +159,7 @@ function Add-AzureSMVmToRM
 
     $parametersFile = New-ArmTemplateParameterFile -ParametersList $actualParameters
     $actualParametersFileName =  [IO.Path]::GetTempFileName()
-    $actualParameters | Out-File $actualParametersFileName
+    $parametersFile | Out-File $actualParametersFileName
 
-    AzureResourceManager\New-AzureResourceGroup -Name ecarm  -TemplateFile $templateFileName -TemplateParameterFile $actualParametersFileName
+    AzureResourceManager\New-AzureResourceGroup -Name ecarm3 -TemplateFile $templateFileName -TemplateParameterFile $actualParametersFileName -Location $location
 }
-
-
-
-
-
-
