@@ -46,7 +46,7 @@ function New-ResourceTemplate
         "type"=  $Type;
         "apiVersion" = $ApiVersion;
         "location" = $Location;
-        "tags" = New-Object -TypeName PSCustomObject @{"deploymentReason" = "ARM";};
+        "tags" = New-Object -TypeName PSCustomObject @{"deploymentReason" = $Global:deploymentTag;};
         "properties" = $Properties;
     }
 
@@ -102,7 +102,7 @@ function New-ArmTemplate
     }
 
     $templateObject = New-Object -TypeName PSCustomObject $template
-    return ConvertTo-Json $templateObject -Depth 5
+    return ConvertTo-Json $templateObject -Depth 15
 }
 
 function New-ArmTemplateParameterFile 
@@ -120,6 +120,6 @@ function New-ArmTemplateParameterFile
     }
 
     $templateObject = New-Object -TypeName PSCustomObject $parameters
-    return ConvertTo-Json $templateObject -Depth 5
+    return ConvertTo-Json $templateObject -Depth 15
 }
 

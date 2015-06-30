@@ -15,7 +15,7 @@
     $createProperties = New-Object -TypeName PSCustomObject @{"addressSpace" = $addressSpace; 'subnets'= $subnets;}
 
     $resource = New-ResourceTemplate -Type "Microsoft.Network/virtualNetworks" -Name $Name `
-        -Location $Location -ApiVersion $Global:apiVersion-Properties $createProperties
+        -Location $Location -ApiVersion $Global:apiVersion -Properties $createProperties
 
     return $resource
 }
@@ -36,7 +36,7 @@ function New-VirtualNetworkSubnet
         $properties.Add('networkSecurityGroup', @{'id' = $networkSecurityGroup})
     }
 
-    $subnet = @{'name' = $Name; 'properties' = $properties}
+    $subnet = @{'name' = $Name; 'properties' = New-Object -TypeName PSCustomObject $properties}
     
     return New-Object -TypeName PSCustomObject $subnet
 }
@@ -55,17 +55,20 @@ function New-NetworkInterfaceResource
         $Dependecies
     )
     
-    $publicIPAddress = New-Object -TypeName PSCustomObject @{'id' = '[resourceId(''Microsoft.Network/publicIPAddresses'',''{0}'')]' -f $PublicAddressName;}
+    $publicIPAddress = New-Object -TypeName PSCustomObject @{'id' = '[resourceId(''Microsoft.Network/publicIPAddresses'',''{0}'')]' -f $PublicIpAddressName;}
     $subnet = New-Object -TypeName PSCustomObject @{'id' = $SubnetReference;}
 
     $ipConfigurations = New-Object -TypeName PSCustomObject @{ `
         'privateIPAllocationMethod' = "Dynamic"; `
         'publicIPAddress' = $publicIPAddress; `
         'subnet' = $subnet;}
-    $createProperties = New-Object -TypeName PSCustomObject @{'ipConfigurations' = $ipConfigurations;}
+
+    $ipConfigName = "{0}_config1" -f $Name
+
+    $createProperties = New-Object -TypeName PSCustomObject @{'ipConfigurations' =  @(New-Object -TypeName PSCustomObject @{'name' =  $ipConfigName; 'properties' = $ipConfigurations;})}
 
     $resource = New-ResourceTemplate -Type "Microsoft.Network/networkInterfaces" -Name $Name `
-        -Location $Location -ApiVersion $Global:apiVersion-Properties $createProperties
+        -Location $Location -ApiVersion $Global:apiVersion -Properties $createProperties -DependsOn $Dependecies
 
     return $resource
 }
@@ -87,7 +90,7 @@ function New-PublicIpAddressResource
     $createProperties = New-Object -TypeName PSCustomObject @{'publicIPAllocationMethod' = $AllocationMethod; 'dnsSettings' = $dnsSettings}
 
     $resource = New-ResourceTemplate -Type "Microsoft.Network/publicIPAddresses" -Name $Name `
-        -Location $Location -ApiVersion $Global:apiVersion-Properties $createProperties
+        -Location $Location -ApiVersion $Global:apiVersion -Properties $createProperties
 
     return $resource
 }

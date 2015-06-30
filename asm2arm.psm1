@@ -136,14 +136,14 @@ function Add-AzureSMVmToRM
 
     # Public IP Address resource
     $ipAddressName = '{0}_armpublicip' -f $vmName
-    $armDnsName = '{0}_arm' -f $ServiceName
+    $armDnsName = '{0}arm' -f $ServiceName
     $publicIPAddressResource = New-PublicIpAddressResource -Name $ipAddressName -Location '[parameters(''location'')]' `
         -AllocationMethod 'Dynamic' -DnsName $armDnsName
     $resources += $publicIPAddressResource
     
     # NIC resource
     $nicName = '{0}_nic' -f $vmName
-    $subnetRef = '[resourceId(''Microsoft.Network/virtualNetworks'',''{0}'')]/subnets/{1}' -f $vnetName, $Global:asm2armSubnet
+    $subnetRef = '[concat(resourceId(''Microsoft.Network/virtualNetworks'',''{0}''),''/subnets/{1}'')]' -f $vnetName, $Global:asm2armSubnet
     $ipAddressDependency = 'Microsoft.Network/publicIPAddresses/{0}' -f $ipAddressName
     $vnetDependency = 'Microsoft.Network/virtualNetworks/{0}' -f $vnetName
     $dependencies = @( $ipAddressDependency, $vnetDependency)
@@ -161,5 +161,14 @@ function Add-AzureSMVmToRM
     $actualParametersFileName =  [IO.Path]::GetTempFileName()
     $parametersFile | Out-File $actualParametersFileName
 
-    AzureResourceManager\New-AzureResourceGroup -Name ecarm3 -TemplateFile $templateFileName -TemplateParameterFile $actualParametersFileName -Location $location
+    $resourceGroup = AzureResourceManager\Get-AzureResourceGroup -Name $Global:resourceGroupName -ErrorAction SilentlyContinue
+
+    if ($resourceGroup -eq $null)
+    {
+        AzureResourceManager\New-AzureResourceGroup -Name $Global:resourceGroupName -Location $location
+    }
+
+    $deploymentName = "{0}_{1}" -f $ServiceName, $Name
+
+    AzureResourceManager\New-AzureResourceGroupDeployment  -ResourceGroupName $Global:resourceGroupName -Name $deploymentName -TemplateFile $templateFileName -TemplateParameterFile $actualParametersFileName -Location $location
 }

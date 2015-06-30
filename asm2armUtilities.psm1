@@ -110,7 +110,7 @@ function Get-AzureArmImageRef
     if ($images.Length -gt 0)
     {
         Write-Output "Found the following potential images:"
-        $images | Select-Object Option, Publisher, Offer, Skus, Version | Format-Table -AutoSize 
+        $images | Select-Object Option, Publisher, Offer, Skus, Version | Format-Table -AutoSize -Force | Out-Host
         $option = Read-Host -Prompt "Please type in the Option number and press Enter"
 
         return $images[$option].Id
