@@ -6,7 +6,7 @@
         $Location
     )
 
-    $createProperties = New-Object -TypeName PSCustomObject @{"accountType" = "Standard_LRS";}
+    $createProperties = [PSCustomObject] @{"accountType" = "Standard_LRS";}
     $resource = New-ResourceTemplate -Type "Microsoft.Storage/storageAccounts" -Name $Name `
         -Location $Location -ApiVersion $Global:apiVersion -Properties $createProperties
 
@@ -21,7 +21,7 @@ function New-ClassicStorageAccountResource
         $Location
     )
 
-    $createProperties = New-Object -TypeName PSCustomObject @{"accountType" = "Standard-LRS";}
+    $createProperties = [PSCustomObject] @{"accountType" = "Standard-LRS";}
     $resource = New-ResourceTemplate -Type "Microsoft.ClassicStorage/storageAccounts" -Name $Name `
         -Location $Location -ApiVersion $Global:classicResourceApiVersion -Properties $createProperties
 

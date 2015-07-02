@@ -51,7 +51,19 @@ function Add-AzureSMVmToRM
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
         [Microsoft.WindowsAzure.Commands.ServiceManagement.Model.PersistentVMRoleContext]
-        $VM
+        $VM,
+
+        [Parameter(Mandatory=$false, ParameterSetName="Use existing disks")]
+        [switch]
+        $KeepDisks,
+
+        [Parameter(Mandatory=$false, ParameterSetName="New data disks")]
+        [switch]
+        $NewDataDisks,
+
+        [Parameter(Mandatory=$false, ParameterSetName="Copy disks")]
+        [switch]
+        $CopyDisks
     )
 
     if ($psCmdlet.ParameterSetName -eq "Service and VM Name")
@@ -93,12 +105,15 @@ function Add-AzureSMVmToRM
     # Resources section
     $resources = @()
 
-    # Storage account resource
-    $storageAccountName = Get-StorageAccountName -NamePrefix $canonicalSubscriptionName
-    if (-not $(Azure\Test-AzureName -Storage $storageAccountName))
+    if ($NewDataDisks.IsPresent -or $CopyDisks.IsPresent)
     {
-        $storageAccountResource = New-StorageAccountResource -Name $storageAccountName -Location '[parameters(''location'')]'
-        $resources += $storageAccountResource
+        # Storage account resource
+        $storageAccountName = Get-StorageAccountName -NamePrefix $canonicalSubscriptionName
+        if (-not $(Azure\Test-AzureName -Storage $storageAccountName))
+        {
+            $storageAccountResource = New-StorageAccountResource -Name $storageAccountName -Location '[parameters(''location'')]'
+            $resources += $storageAccountResource
+        }
     }
     
     # Virtual network resource
@@ -114,25 +129,11 @@ function Add-AzureSMVmToRM
     }
 
     # Compute, VM resource
-    # Find the VMs image on the catalog
-    $imageName = $vm.VM.OSVirtualHardDisk.SourceImageName
-
-    $vmImage = Azure\Get-AzureVMImage -ImageName $imageName -ErrorAction SilentlyContinue -ErrorVariable $lastError
-
-    if (-not $vmImage)
-    {
-        $message = "VM Image {0} for VM {1} on service {3} cannot be found." -f $imageName, $Name, $imageName
-        Write-Verbose $lastError
-        throw $message
-    }
-
     $cloudService = Azure\Get-AzureService -ServiceName $VM.ServiceName
     $location= $cloudService.Location
     $actualParameters['location'] = $location
-
-    $armImageReference = Get-AzureArmImageRef -Location $location -Image $vmImage
-
     $vmName = '{0}_{1}' -f $ServiceName, $Name
+
 
     # Public IP Address resource
     $ipAddressName = '{0}_armpublicip' -f $vmName
@@ -151,7 +152,49 @@ function Add-AzureSMVmToRM
         -PublicIpAddressName $ipAddressName -SubnetReference $subnetRef -Dependecies $dependencies
     $resources += $nicResource
 
-    $parameters = New-Object -TypeName PSCustomObject $parametersObject
+    # VM
+
+    # Find the VMs image on the catalog
+    $imageName = $VM.VM.OSVirtualHardDisk.SourceImageName
+
+    $vmImage = Azure\Get-AzureVMImage -ImageName $imageName -ErrorAction SilentlyContinue -ErrorVariable $lastError
+
+    if (-not $vmImage)
+    {
+        $message = "VM Image {0} for VM {1} on service {3} cannot be found." -f $imageName, $Name, $imageName
+        Write-Verbose $lastError
+        throw $message
+    }
+
+    $vmStorageProfile = $null
+
+    if ($NewDataDisks.IsPresent)
+    {
+        $armImageReference = Get-AzureArmImageRef -Location $location -Image $vmImage
+        $vmStorageProfile = New-VmStorageProfile -ArmImageReference $armImageReference -VM $VM -StorageAccountName $storageAccountName
+    }
+
+    if ($KeepDisks.IsPresent)
+    {
+        $vmStorageProfile = New-VmStorageProfile -VM $VM -KeepDisks
+    }
+
+    if ($CopyDisks.IsPresent)
+    {
+        $vmStorageProfile = New-VmStorageProfile -VM $VM -StorageAccountName $storageAccountName -CopyDisks
+    }
+
+    if ($vmStorageProfile -eq $null)
+    {
+        throw "Cannot build storage profile"
+    }
+
+    $credentials = Get-Credential
+
+    $vmResource = New-VmResource -VM $VM -Credentials $credentials -StorageProfile $vmStorageProfile -NetworkInterface $nicName
+    $resources += $vmResource
+    
+    $parameters = [PSCustomObject] $parametersObject
     
     $template = New-ArmTemplate -Parameters $parameters -Resources $resources
     $templateFileName =  [IO.Path]::GetTempFileName()

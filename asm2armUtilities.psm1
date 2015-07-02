@@ -85,7 +85,7 @@ function Get-AzureArmImageRef
 
     if ($skusWithMaximumRank.length -eq 0)
     {
-        return @()
+        return $null
     }
 
     $images = @()
@@ -113,12 +113,12 @@ function Get-AzureArmImageRef
         $images | Select-Object Option, Publisher, Offer, Skus, Version | Format-Table -AutoSize -Force | Out-Host
         $option = Read-Host -Prompt "Please type in the Option number and press Enter"
 
-        return $images[$option].Id
+        return $images[$option]
     }
 
     if ($skusWithMaximumRank.length -eq 0)
     {
-        return @()
+        return $null
     }
 }
 
@@ -266,7 +266,7 @@ function Get-HostRange
     $networkRange = @{'Network' = Get-DecimalIp $uintNetwork; 'Broadcast' = Get-DecimalIp $broadcast; `
         'Hosts' = ($broadcast - $uintNetwork - 1); 'StartHost' = Get-DecimalIp ($uintNetwork + 1); 'EndHost' = Get-DecimalIp($broadcast - 1); `
         'BroadcastInt' = $broadcast; 'NetworkInt' = $uintNetwork}
-    return New-Object -TypeName PSCustomObject $networkRange
+    return [PSCustomObject] $networkRange
 }
 
 function Get-DecimalIp
