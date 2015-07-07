@@ -8,7 +8,7 @@
 
     $createProperties = [PSCustomObject] @{"accountType" = "Standard_LRS";}
     $resource = New-ResourceTemplate -Type "Microsoft.Storage/storageAccounts" -Name $Name `
-        -Location $Location -ApiVersion $Global:apiVersion -Properties $createProperties
+        -Location $Location -ApiVersion $Global:previewApiVersion -Properties $createProperties
 
     return $resource
 }
