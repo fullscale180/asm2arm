@@ -33,8 +33,23 @@
 
     if ($CopyDisks.IsPresent)
     {
+        Copy-VmDisks -VM $VM -StorageAccountName $StorageAccountName       
+    }
 
-        $copyScriptBlock = {
+}
+
+
+function Copy-VmDisks
+{
+    Param (
+        [Microsoft.WindowsAzure.Commands.ServiceManagement.Model.PersistentVMRoleContext]
+        $VM,
+
+        [string]
+        $StorageAccountName
+    )
+
+     $copyScriptBlock = {
             param($srcUrl, $srcContext, $srcContainer, $srcBlob, $destContainer, $destBlob, $destContext)
 
             
@@ -71,7 +86,11 @@
         $destinationContext = AzureResourceManager\New-AzureStorageContext -StorageAccountName $sourceStorageAccountName -StorageAccountKey $destinationAccountKey
 
         $vmOsDiskStorageAccountName = ([System.Uri]$VM.VM.OSVirtualHardDisk.MediaLink).Host.Split('.')[0]
-        $diskUrlsToCopy = @($VM.VM.OSVirtualHardDisk.MediaLink)
+        $diskUrlsToCopy = @($VM.VM.OSVirtualHardDisk.MediaLink.AbsoluteUri)
+        foreach ($disk in $VM.VM.DataVirtualHardDisks)
+        {
+            $diskUrlsToCopy += $disk.MediaLink.AbsoluteUri
+        }
         
         # Prepare a context in case the source storage account is still the same
         $vmOsDiskStorageAccountKey = (Azure\Get-AzureStorageKey -StorageAccountName $vmOsDiskStorageAccountName).Primary
@@ -108,6 +127,4 @@
         Wait-Job -Job $copyJobs
         Receive-Job -Job $copyJobs
         Remove-Job -Job $copyJobs
-    }
-
 }
