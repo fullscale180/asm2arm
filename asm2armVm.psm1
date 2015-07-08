@@ -1,43 +1,61 @@
 ﻿function New-VmStorageProfile 
 {
     Param (
-
-        [PsCustomObject]
-        $ArmImageReference,
-
+		[Parameter(Mandatory=$true, ParameterSetName='Virtual Machine')]
+        [ValidateNotNull()]
+        [ValidateNotNullOrEmpty()]
         [Microsoft.WindowsAzure.Commands.ServiceManagement.Model.PersistentVMRoleContext]
         $VM,
 
-        [switch]
-        $KeepDisks,
+		[Parameter(Mandatory=$false, ParameterSetName='Gallery Image')]
+        $ImageName,
+
+        # Location to search the image reference in
+		[Parameter(Mandatory=$false, ParameterSetName='Gallery Image')]
+        $Location,
 
         [string]
-        $StorageAccountName,
-
-        [switch]
-        $CopyDisks
+		[Parameter(Mandatory=$false, ParameterSetName='Storage Account')]
+        $StorageAccountName
     )
 
     $storageProfile = @{}
-    if ($ArmImageReference)
-    {
-        $imageReference =[PSCustomObject] @{'publisher' = $ArmImageReference.Publisher; `
-                                            'offer'= $ArmImageReference.Offer;
-                                            'sku'= $ArmImageReference.Skus;
-                                            'version'= $ArmImageReference.Version;}  
-        $storageProfile.Add('imageReference', $imageReference)                  
-    }
-
     $osDisk = @{}
     $dataDisks = @()
 
-    if ($CopyDisks.IsPresent)
+    if ($ImageName)
     {
-        Copy-VmDisks -VM $VM -StorageAccountName $StorageAccountName       
+        # Find the VMs image on the catalog
+		$vmImage = Azure\Get-AzureVMImage -ImageName $ImageName -ErrorAction SilentlyContinue -ErrorVariable $lastError
+
+		if (-not $vmImage)
+		{
+			$message = "Disk image {0} cannot be found for the specified VM." -f $ImageName
+
+			Write-Error $message
+			throw $message
+		}
+
+		# Retrieve the ARM Image reference for a given ASM image
+		$armImageReference = Get-AzureArmImageRef -Location $Location -Image $vmImage
+
+        $imageReference =[PSCustomObject] @{'publisher' = $armImageReference.Publisher; `
+                                            'offer'= $armImageReference.Offer;
+                                            'sku'= $armImageReference.Skus;
+                                            'version'= $armImageReference.Version;}  
+        $storageProfile.Add('imageReference', $imageReference)                  
     }
 
-}
+	# Compose OS disk section
+    $osDisk =[PSCustomObject] @{'name' = 'osdisk'; `
+                                'vhd'= [PSCustomObject] @{ 'uri' = '???'};
+                                'caching'= 'ReadWrite';
+                                'createOption'= 'FromImage';} 
 
+	$storageProfile.Add('osDisk', $osDisk)                  
+
+	return $storageProfile
+}
 
 function Copy-VmDisks
 {
