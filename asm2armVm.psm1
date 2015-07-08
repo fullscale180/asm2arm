@@ -7,20 +7,21 @@
         [Microsoft.WindowsAzure.Commands.ServiceManagement.Model.PersistentVMRoleContext]
         $VM,
 
+		[Parameter(Mandatory=$false, ParameterSetName='Storage Account')]
+        [ValidateNotNull()]
+        [ValidateNotNullOrEmpty()]
+		[string]
+        $StorageAccountName,
+
 		[Parameter(Mandatory=$false, ParameterSetName='Gallery Image')]
         $ImageName,
 
         # Location to search the image reference in
 		[Parameter(Mandatory=$false, ParameterSetName='Gallery Image')]
-        $Location,
-
-        [string]
-		[Parameter(Mandatory=$false, ParameterSetName='Storage Account')]
-        $StorageAccountName
+        $Location
     )
 
     $storageProfile = @{}
-    $osDisk = @{}
     $dataDisks = @()
 
     if ($ImageName)
@@ -43,16 +44,33 @@
                                             'offer'= $armImageReference.Offer;
                                             'sku'= $armImageReference.Skus;
                                             'version'= $armImageReference.Version;}  
+
+		# Add the imageReference section to the resource metadata
         $storageProfile.Add('imageReference', $imageReference)                  
     }
 
 	# Compose OS disk section
     $osDisk =[PSCustomObject] @{'name' = 'osdisk'; `
-                                'vhd'= [PSCustomObject] @{ 'uri' = '???'};
+                                'vhd'= @{ 'uri' = $VM.VM.OSVirtualHardDisk.MediaLink.AbsoluteUri};
                                 'caching'= 'ReadWrite';
                                 'createOption'= 'FromImage';} 
 
+	# Add the osDisk section to the resource metadata
 	$storageProfile.Add('osDisk', $osDisk)                  
+
+	# Compose data disk section
+    foreach ($disk in $VM.VM.DataVirtualHardDisks)
+    {
+        $dataDisks += @{'name' = $disk.DiskName; `
+						'diskSizeGB'= $disk.LogicalDiskSizeInGB;
+						'lun'= $disk.Lun;
+						'vhd'= @{ 'Uri' = $disk.MediaLink.AbsoluteUri};
+						'caching'= 'ReadWrite';
+						'createOption'= 'FromImage';}   
+    }
+
+	# Add the dataDisks section to the resource metadata
+	$storageProfile.Add('dataDisks', [PSCustomObject] $dataDisks)  
 
 	return $storageProfile
 }
