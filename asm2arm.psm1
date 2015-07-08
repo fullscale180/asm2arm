@@ -53,17 +53,9 @@ function Add-AzureSMVmToRM
         [Microsoft.WindowsAzure.Commands.ServiceManagement.Model.PersistentVMRoleContext]
         $VM,
 
-        [Parameter(Mandatory=$false, ParameterSetName="Use existing disks")]
-        [switch]
-        $KeepDisks,
-
-        [Parameter(Mandatory=$false, ParameterSetName="New data disks")]
-        [switch]
-        $NewDataDisks,
-
-        [Parameter(Mandatory=$false, ParameterSetName="Copy disks")]
-        [switch]
-        $CopyDisks
+        [Parameter(Mandatory=$true)]
+        [ValidateSet("KeepDisks", "NewDisks", "CopyDisks")]
+        $DiskAction
     )
 
     if ($psCmdlet.ParameterSetName -eq "Service and VM Name")
@@ -105,7 +97,7 @@ function Add-AzureSMVmToRM
     # Resources section
     $resources = @()
 
-    if ($NewDataDisks.IsPresent -or $CopyDisks.IsPresent)
+    if ($DiskAction -eq 'NewDisks' -or $DiskAction -eq 'CopyDisks')
     {
         # Storage account resource
         $storageAccountName = Get-StorageAccountName -NamePrefix $canonicalSubscriptionName
@@ -118,6 +110,11 @@ function Add-AzureSMVmToRM
     
     # Virtual network resource
     $vnetName = $asm2armVnetName
+    if ($VM.VirtualNetworkName -ne "")
+    {
+        $vnetName += $Global:armSuffix
+    }
+    
     if ($(AzureResourceManager\Get-AzureVirtualNetwork -Name $vnetName -ErrorAction SilentlyContinue) -eq $null)
     {
         $virtualNetworkAddressSpaces = AzureResourceManager\Get-AzureVirtualNetwork | %{$_.AddressSpace.AddressPrefixes}
@@ -127,13 +124,21 @@ function Add-AzureSMVmToRM
         $vnetResource = New-VirtualNetworkResource -Name $vnetName -Location '[parameters(''location'')]' -AddressSpacePrefixes @($vnetAddressSpace) -Subnets @($subnet)
         $resources += $vnetResource
     }
+    else {
+        ###### TODO Take care of checking the subnet, and adding it to the resource as necessary
+    }
 
-    # Compute, VM resource
+    # Availability set resource
+    if ($VM.AvailabilitySetName -ne "")
+    {
+        $availabilitySetResource = New-AvailabilitySetResource -Name $VM.AvailabilitySetName -Location '[parameters(''location'')]'
+        $resources += $availabilitySetResource
+    }
+
     $cloudService = Azure\Get-AzureService -ServiceName $VM.ServiceName
     $location= $cloudService.Location
     $actualParameters['location'] = $location
     $vmName = '{0}_{1}' -f $ServiceName, $Name
-
 
     # Public IP Address resource
     $ipAddressName = '{0}_armpublicip' -f $vmName
@@ -153,45 +158,9 @@ function Add-AzureSMVmToRM
     $resources += $nicResource
 
     # VM
-
-    # Find the VMs image on the catalog
-    $imageName = $VM.VM.OSVirtualHardDisk.SourceImageName
-
-    $vmImage = Azure\Get-AzureVMImage -ImageName $imageName -ErrorAction SilentlyContinue -ErrorVariable $lastError
-
-    if (-not $vmImage)
-    {
-        $message = "VM Image {0} for VM {1} on service {3} cannot be found." -f $imageName, $Name, $imageName
-        Write-Verbose $lastError
-        throw $message
-    }
-
-    $vmStorageProfile = $null
-
-    if ($NewDataDisks.IsPresent)
-    {
-        $armImageReference = Get-AzureArmImageRef -Location $location -Image $vmImage
-        $vmStorageProfile = New-VmStorageProfile -ArmImageReference $armImageReference -VM $VM -StorageAccountName $storageAccountName
-    }
-
-    if ($KeepDisks.IsPresent)
-    {
-        $vmStorageProfile = New-VmStorageProfile -VM $VM -KeepDisks
-    }
-
-    if ($CopyDisks.IsPresent)
-    {
-        $vmStorageProfile = New-VmStorageProfile -VM $VM -StorageAccountName $storageAccountName -CopyDisks
-    }
-
-    if ($vmStorageProfile -eq $null)
-    {
-        throw "Cannot build storage profile"
-    }
-
     $credentials = Get-Credential
 
-    $vmResource = New-VmResource -VM $VM -Credentials $credentials -StorageProfile $vmStorageProfile -NetworkInterface $nicName
+    $vmResource = New-VmResource -VM $VM -Credentials $credentials -NetworkInterface $nicName -DiskAction $DiskAction
     $resources += $vmResource
     
     $parameters = [PSCustomObject] $parametersObject
