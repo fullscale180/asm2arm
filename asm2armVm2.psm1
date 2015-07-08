@@ -24,15 +24,14 @@ function New-VmResource
         [PSCredential]
         $Credentials, 
         
-        [string]
         $NetworkInterfaceName,
-
-        [string]
         $DiskAction
     )
 
+    ### VAL Please move this into new-VmStrageProfile
         # Find the VMs image on the catalog
-    $imageName = $VM.VM.OSVirtualHardDisk.SourceImageName
+        <#
+   $imageName = $VM.VM.OSVirtualHardDisk.SourceImageName
 
     $vmImage = Azure\Get-AzureVMImage -ImageName $imageName -ErrorAction SilentlyContinue -ErrorVariable $lastError
 
@@ -42,13 +41,17 @@ function New-VmResource
         Write-Verbose $lastError
         throw $message
     }
+    #>
+    ##### END
 
     $vmStorageProfile = $null
 
+    ## AND Branch on DiskAction in the New-VMStorageProfile to bring this in
+    <#
     if ($DiskAction -eq "NewDisks")
     {
         $armImageReference = Get-AzureArmImageRef -Location $location -Image $vmImage
-        $vmStorageProfile = New-VmStorageProfile -ArmImageReference $armImageReference -VM $VM -StorageAccountName $storageAccountName
+        $vmStorageProfile = New-VmStorageProfile -DiskAction $DiskAction -VM $VM -StorageAccountName $storageAccountName
     }
 
     if ($DiskAction -eq "KeepDisks")
@@ -65,6 +68,13 @@ function New-VmResource
     {
         throw "Cannot build storage profile"
     }
+    #>
+
+    $vmStorageProfile = New-VmStorageProfile -DiskAction $DiskAction -VM $VM -StorageAccountName $storageAccountName
+    
+    $properties = @{}
+    if ($vm.AvailabilitySetName -ne "")
+    {
 
 
 }
