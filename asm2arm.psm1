@@ -80,7 +80,24 @@ function Add-AzureSMVmToRM
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
         [string]
-        $KeyVaultVaultName
+        $KeyVaultVaultName,
+
+        # In case the VM uses custom certificates, they need to be uploaded to KeyVault
+        # Please provide certificate names that reside on the given vault
+        [Parameter(Mandatory=$false, ParameterSetName='Custom certificates')]
+        [Parameter(ParameterSetName='Custom WinRM certificate')]
+        [ValidateNotNull()]
+        [ValidateNotNullOrEmpty()]
+        [string[]]
+        $CertificatesToInstall,
+
+        # In case the VM uses a custom WinRM certificate, they need to be uploaded to KeyVault
+        # Please name the certificate to be used for WinRM among the names provided in $CertificatesToInstall parameter
+        [Parameter(ParameterSetName='Custom WinRM certificate')]
+        [ValidateNotNull()]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $WinRmCertificateName
     )
 
     if ($psCmdlet.ParameterSetName -eq "Service and VM Name")

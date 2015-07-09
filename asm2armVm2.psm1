@@ -25,7 +25,11 @@ function New-VmResource
 		$Credentials, 
 		
 		$NetworkInterfaceName,
-		$DiskAction
+		$DiskAction,
+        $KeyVaultResourceName,
+        $KeyVaultVaultName,
+        $CertificatesToInstall,
+        $WinRmCertificateName
 	)
 
     
@@ -129,4 +133,15 @@ function Get-AzureArmVmSize
 
 	return $sizes[$Size]
 
+}
+
+function New-KeyVaultCertificaterUri
+{
+    Param
+    (
+        $KeyVaultResourceName,
+        $KeyVaultVaultName,
+        $CertificateName,
+        $CertificateThumprint
+    )
 }
