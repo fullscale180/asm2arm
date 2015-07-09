@@ -1,13 +1,17 @@
 ﻿function New-VmStorageProfile 
 {
 	Param (
+		[Parameter(Mandatory=$true)]
+		[ValidateSet("KeepDisks", "NewDisks", "CopyDisks")]
+		$DiskAction,
+
 		[Parameter(Mandatory=$true, ParameterSetName='Virtual Machine')]
 		[ValidateNotNull()]
 		[ValidateNotNullOrEmpty()]
 		[Microsoft.WindowsAzure.Commands.ServiceManagement.Model.PersistentVMRoleContext]
 		$VM,
 
-		[Parameter(Mandatory=$false, ParameterSetName='Storage Account')]
+		[Parameter(Mandatory=$true, ParameterSetName='Storage Account')]
 		[ValidateNotNull()]
 		[ValidateNotNullOrEmpty()]
 		[string]
@@ -23,8 +27,14 @@
 
 	$storageProfile = @{}
 	$dataDisks = @()
+	$osDiskCreateOption = "Attach"
+	$dataDiskCreateOption = "Attach"
 
-	if ($ImageName)
+	# Construct a new URI for the OS disk, which will be placed in the new storage account
+	$osDiskUri = Get-NewBlobLocation -SourceBlobUri $VM.VM.OSVirtualHardDisk.MediaLink.AbsoluteUri -StorageAccountName $StorageAccountName -ContainerName $Global:vhdContainerName
+
+	# Use a vanilla VM disk image from the Azure gallery
+	if ($DiskAction -eq "NewDisks")
 	{
 		# Find the VMs image on the catalog
 		$vmImage = Azure\Get-AzureVMImage -ImageName $ImageName -ErrorAction SilentlyContinue -ErrorVariable $lastError
@@ -46,14 +56,31 @@
 											'version'= $armImageReference.Version;}  
 
 		# Add the imageReference section to the resource metadata
-		$storageProfile.Add('imageReference', $imageReference)                  
+		$storageProfile.Add('imageReference', $imageReference)    
+
+		# Request that OS data disk is created from base image
+		$dataDiskCreateOption = "FromImage"
+		
+		# Request that all data disks are created as empty
+		$dataDiskCreateOption = "Empty"   
+	}
+	elseif ($DiskAction -eq "CopyDisks")
+	{
+		# Create a copy of the existing VM disk
+		Copy-VmDisks -VM $VM -StorageAccountName $StorageAccountName
+	}
+	elseif ($DiskAction -eq "KeepDisks")
+	{
+		# Reuse the existing OS disk image
+		$osDiskUri = $VM.VM.OSVirtualHardDisk.MediaLink.AbsoluteUri
 	}
 
 	# Compose OS disk section
 	$osDisk =[PSCustomObject] @{'name' = 'osdisk'; `
-								'vhd'= @{ 'uri' = $VM.VM.OSVirtualHardDisk.MediaLink.AbsoluteUri};
+								'osType' = $VM.VM.OSVirtualHardDisk.OS;
+								'vhd'= @{ 'uri' = $osDiskUri };
 								'caching'= 'ReadWrite';
-								'createOption'= 'FromImage';} 
+								'createOption'= $osDiskCreateOption;} 
 
 	# Add the osDisk section to the resource metadata
 	$storageProfile.Add('osDisk', $osDisk)                  
@@ -61,12 +88,23 @@
 	# Compose data disk section
 	foreach ($disk in $VM.VM.DataVirtualHardDisks)
 	{
+		# Modify data disk URI to point to a copy of the disk
+		if ($DiskAction -eq "KeepDisks")
+		{
+			$dataDiskUri = $disk.MediaLink.AbsoluteUri
+		}
+		else
+		{
+			# Construct a new URI for the OS disk, which will be placed in the new storage account
+			$dataDiskUri = Get-NewBlobLocation -SourceBlobUri $disk.MediaLink.AbsoluteUri -StorageAccountName $StorageAccountName -ContainerName $Global:vhdContainerName
+		}
+
 		$dataDisks += @{'name' = $disk.DiskName; `
 						'diskSizeGB'= $disk.LogicalDiskSizeInGB;
 						'lun'= $disk.Lun;
-						'vhd'= @{ 'Uri' = $disk.MediaLink.AbsoluteUri};
+						'vhd'= @{ 'Uri' = $dataDiskUri };
 						'caching'= 'ReadWrite';
-						'createOption'= 'FromImage';}   
+						'createOption'= $dataDiskCreateOption; }   
 	}
 
 	# Add the dataDisks section to the resource metadata
@@ -138,7 +176,7 @@ function Copy-VmDisks
 
 		$previousStorageAccountName = ""
 		$copyJobs = @()
-		$destContainerName = "vhds"
+		$destContainerName = $Global:vhdContainerName
 
 		foreach ($url in $diskUrlsToCopy)
 		{
