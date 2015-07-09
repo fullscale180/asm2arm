@@ -46,11 +46,21 @@ function New-VmResource
     $vmStorageProfile = New-VmStorageProfile -DiskAction $DiskAction -VM $VM -StorageAccountName $storageAccountName
     $osProfile = @{'computerName' = $vm.Name; 'adminUsername' = $Credentials.UserName; 'adminPassword' = $Credentials.Password}
     
+    $endpoints = $VM | Azure\Get-AzureEndpoint
+
     if ($VM.vm.OSVirtualHardDisk.OS -eq "Windows")
     {
         
         $winRMListeners = @()
-        if ($VM.vm.
+        $winRmEndpoint = $endpoints | Where-Object {$_.Name -eq "PowerShell"}
+        if ($winRmEndpoint -ne $null)
+        {
+            $wimRmUrlScheme = ($VM | Azure\Get-AzureWinRMUri).Scheme
+            
+          
+            $listener = 
+
+        }
         
         $windowsConfiguration = @{
                 'provisionVMAgent' = $vm.vm.ProvisionGuestAgent;

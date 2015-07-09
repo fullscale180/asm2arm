@@ -62,7 +62,18 @@ function Add-AzureSMVmToRM
 
         [Parameter(Mandatory=$true)]
         [ValidateSet("KeepDisks", "NewDisks", "CopyDisks")]
-        $DiskAction
+        $DiskAction,
+
+        # In case the VM uses custom certificates, they need to be uploaded to KeyVault
+        # Please provide the URI part minus the certificate thumbprint(s) here. We assume
+        # all of the certificates live in the same location for this VM
+        # E.g. if the cert is at https://testault.vault.azure.net/secrets/testcert/b621es1db241e56a72d037479xab1r7
+        # please provide only https://testault.vault.azure.net/secrets/testcert
+        [Parameter(Mandatory=$false)]
+        [ValidateNotNull()]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $KeyVaultUriPart
     )
 
     if ($psCmdlet.ParameterSetName -eq "Service and VM Name")
@@ -85,6 +96,11 @@ function Add-AzureSMVmToRM
     {
         throw "VM is not present"
     } 
+
+    if (-not $VM.VM.WinRMCertificate -and -not $KeyVaultUriPart)
+    {
+        throw ("The VM uses a custom certificate for WinRM. Please upload it to KeyVault, and provide the uri part with the KeyVaultUriPart parameter the thumbprint of the certificate is {0}" -f $VM.VM.WinRMCertificate)
+    }
 
     $currentSubscription = AzureResourceManager\Get-AzureSubscription -Current
     
@@ -165,6 +181,8 @@ function Add-AzureSMVmToRM
     $resources += $nicResource
 
     # VM
+
+
     $credentials = Get-Credential
 
     $vmResource = New-VmResource -VM $VM -Credentials $credentials -NetworkInterface $nicName -DiskAction $DiskAction
