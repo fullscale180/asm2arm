@@ -126,6 +126,20 @@ function Add-AzureSMVmToRM
         throw ("The VM uses a custom certificate for WinRM. Please upload it to KeyVault, and provide KeyVault resoruce name, vault name in the parameters. Thumbprint of the certificate is {0}" -f $VM.VM.WinRMCertificate)
     }
 
+    if ($WinRmCertificateName -and -not $CertificatesToInstall.Contains($WinRmCertificateName))
+    {
+        throw ("Please ensure WinRM certificate name {0} is included in the $CertificatesToInstall parameter" -f $WinRmCertificateName)
+    }
+
+    if ($VM.VM.WinRMCertificate)
+    {
+        $cert = AzureResourceManager\Get-AzureKeyVaultSecret -VaultName $KeyVaultVaultName -Name $WinRmCertificateName -ErrorAction SilentlyContinue
+        if ($cert -eq $null)
+        {
+            throw ("Cannot find the WinRM certificate {0} with thumbprint {1}. Please ensure certificate is added in the vault {2} secrets." -f $WinRmCertificateName, $VM.VM.WinRMCertificate, $KeyVaultVaultName)
+        }
+    }
+
     $currentSubscription = AzureResourceManager\Get-AzureSubscription -Current
     
     # Generate a canonical subscription name to use as the stem for other names

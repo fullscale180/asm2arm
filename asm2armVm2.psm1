@@ -20,10 +20,8 @@ function New-VmResource
 	(
 		[Microsoft.WindowsAzure.Commands.ServiceManagement.Model.PersistentVMRoleContext]
 		$VM,
-		
 		[PSCredential]
 		$Credentials, 
-		
 		$NetworkInterfaceName,
 		$DiskAction,
         $KeyVaultResourceName,
@@ -49,6 +47,8 @@ function New-VmResource
     }
 
     $osProfile = @{'computerName' = $vm.Name; 'adminUsername' = $Credentials.UserName; 'adminPassword' = $Credentials.Password}
+
+
     
     $endpoints = $VM | Azure\Get-AzureEndpoint
 
@@ -139,9 +139,12 @@ function New-KeyVaultCertificaterUri
 {
     Param
     (
-        $KeyVaultResourceName,
         $KeyVaultVaultName,
         $CertificateName,
         $CertificateThumprint
     )
+
+    $uri = "https://{0}.vault.azure.net/secrets/{1}/{2}" -f $KeyVaultResourceName, $CertificateName, $CertificateThumprint
+
+    return $uri
 }
