@@ -53,6 +53,13 @@ function Add-AzureSMVmToRM
         [Microsoft.WindowsAzure.Commands.ServiceManagement.Model.PersistentVMRoleContext]
         $VM,
 
+        # Name of the Resource Group the deployment is going to be placed into
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNull()]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $ResourceGroupName,
+
         [Parameter(Mandatory=$true)]
         [ValidateSet("KeepDisks", "NewDisks", "CopyDisks")]
         $DiskAction
@@ -115,7 +122,7 @@ function Add-AzureSMVmToRM
         $vnetName += $Global:armSuffix
     }
     
-    if ($(AzureResourceManager\Get-AzureVirtualNetwork -Name $vnetName -ErrorAction SilentlyContinue) -eq $null)
+    if ($(AzureResourceManager\Get-AzureVirtualNetwork -Name $vnetName -ResourceGroupName $ResourceGroupName -ErrorAction SilentlyContinue) -eq $null)
     {
         $virtualNetworkAddressSpaces = AzureResourceManager\Get-AzureVirtualNetwork | %{$_.AddressSpace.AddressPrefixes}
         $vnetAddressSpace = Get-AvailableAddressSpace $virtualNetworkAddressSpaces
@@ -173,14 +180,14 @@ function Add-AzureSMVmToRM
     $actualParametersFileName =  [IO.Path]::GetTempFileName()
     $parametersFile | Out-File $actualParametersFileName
 
-    $resourceGroup = AzureResourceManager\Get-AzureResourceGroup -Name $Global:resourceGroupName -ErrorAction SilentlyContinue
+    $resourceGroup = AzureResourceManager\Get-AzureResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
 
     if ($resourceGroup -eq $null)
     {
-        AzureResourceManager\New-AzureResourceGroup -Name $Global:resourceGroupName -Location $location
+        AzureResourceManager\New-AzureResourceGroup -Name $ResourceGroupName -Location $location
     }
 
     $deploymentName = "{0}_{1}" -f $ServiceName, $Name
 
-    AzureResourceManager\New-AzureResourceGroupDeployment  -ResourceGroupName $Global:resourceGroupName -Name $deploymentName -TemplateFile $templateFileName -TemplateParameterFile $actualParametersFileName -Location $location
+    AzureResourceManager\New-AzureResourceGroupDeployment  -ResourceGroupName $ResourceGroupName -Name $deploymentName -TemplateFile $templateFileName -TemplateParameterFile $actualParametersFileName -Location $location
 }

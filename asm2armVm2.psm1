@@ -28,26 +28,7 @@ function New-VmResource
         $DiskAction
     )
 
-    $vmStorageProfile = $null
-
-    if ($DiskAction -eq "NewDisks")
-    {
-		# Use a vanilla VM disk image from the Azure gallery
-		$vmStorageProfile = New-VmStorageProfile -VM $VM -ImageName $VM.VM.OSVirtualHardDisk.SourceImageName -Location $location
-    }
-    elseif ($DiskAction -eq "KeepDisks")
-    {
-		# Use the existing VM disk images "as is"
-        $vmStorageProfile = New-VmStorageProfile -VM $VM
-    }
-	elseif ($DiskAction -eq "CopyDisks")
-    {
-		# Create a copy of the existing VM disk
-		Copy-VmDisks -VM $VM -StorageAccountName $StorageAccountName
-
-		# Use copies of the existing VM disk images
-        $vmStorageProfile = New-VmStorageProfile -VM $VM
-    }
+    $vmStorageProfile = New-VmStorageProfile -VM $VM -Location $location -DiskAction $DiskAction
 
     if ($vmStorageProfile -eq $null)
     {
@@ -64,8 +45,10 @@ function New-VmResource
     $vmSize = Get-AzureArmVmSize -Size $VM.InstanceSize
     $vmStorageProfile = New-VmStorageProfile -DiskAction $DiskAction -VM $VM -StorageAccountName $storageAccountName
     $osProfile = @{'computerName' = $vm.Name; 'adminUsername' = $Credentials.UserName; 'adminPassword' = $Credentials.Password}
+    
     if ($VM.vm.OSVirtualHardDisk.OS -eq "Windows")
     {
+        
         $winRMListeners = @()
         if ($VM.vm.
         
