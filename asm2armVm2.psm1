@@ -28,47 +28,31 @@ function New-VmResource
         $DiskAction
     )
 
-    ### VAL Please move this into new-VmStrageProfile
-        # Find the VMs image on the catalog
-        <#
-   $imageName = $VM.VM.OSVirtualHardDisk.SourceImageName
-
-    $vmImage = Azure\Get-AzureVMImage -ImageName $imageName -ErrorAction SilentlyContinue -ErrorVariable $lastError
-
-    if (-not $vmImage)
-    {
-        $message = "VM Image {0} for VM {1} on service {3} cannot be found." -f $imageName, $Name, $imageName
-        Write-Verbose $lastError
-        throw $message
-    }
-    #>
-    ##### END
-
     $vmStorageProfile = $null
 
-    ## AND Branch on DiskAction in the New-VMStorageProfile to bring this in
-    <#
     if ($DiskAction -eq "NewDisks")
     {
-        $armImageReference = Get-AzureArmImageRef -Location $location -Image $vmImage
-        $vmStorageProfile = New-VmStorageProfile -DiskAction $DiskAction -VM $VM -StorageAccountName $storageAccountName
+		# Use a vanilla VM disk image from the Azure gallery
+		$vmStorageProfile = New-VmStorageProfile -VM $VM -ImageName $VM.VM.OSVirtualHardDisk.SourceImageName -Location $location
     }
-
-    if ($DiskAction -eq "KeepDisks")
+    elseif ($DiskAction -eq "KeepDisks")
     {
-        $vmStorageProfile = New-VmStorageProfile -VM $VM -KeepDisks
+		# Use the existing VM disk images "as is"
+        $vmStorageProfile = New-VmStorageProfile -VM $VM
     }
-
-    if ($DiskAction -eq "CopyDisks")
+	elseif ($DiskAction -eq "CopyDisks")
     {
-        $vmStorageProfile = New-VmStorageProfile -VM $VM -StorageAccountName $storageAccountName -CopyDisks
+		# Create a copy of the existing VM disk
+		Copy-VmDisks -VM $VM -StorageAccountName $StorageAccountName
+
+		# Use copies of the existing VM disk images
+        $vmStorageProfile = New-VmStorageProfile -VM $VM
     }
 
     if ($vmStorageProfile -eq $null)
     {
         throw "Cannot build storage profile"
     }
-    #>
         
     $properties = @{}
     if ($vm.AvailabilitySetName -ne "")
@@ -88,7 +72,7 @@ function New-VmResource
         $windowsConfiguration = @{
                 'provisionVMAgent' = $vm.vm.ProvisionGuestAgent;
                 'winRM' = @{
-                    'listeners' = 
+                    'listeners' = '';
                 }
             }
     }
