@@ -170,13 +170,15 @@ function Add-AzureSMVmToRM
     }
     
     # Virtual network resource
-    $vnetName = $asm2armVnetName
+    $vnetName = $Global:asm2armVnetName
     if ($VM.VirtualNetworkName -ne "")
     {
         $vnetName += $Global:armSuffix
     }
     
-    if ($(AzureResourceManager\Get-AzureVirtualNetwork -Name $vnetName -ResourceGroupName $ResourceGroupName -ErrorAction SilentlyContinue) -eq $null)
+	$currentVnet = AzureResourceManager\Get-AzureVirtualNetwork -Name $vnetName -ResourceGroupName $ResourceGroupName -ErrorAction SilentlyContinue
+
+    if ($currentVnet -eq $null)
     {
         $virtualNetworkAddressSpaces = AzureResourceManager\Get-AzureVirtualNetwork | %{$_.AddressSpace.AddressPrefixes}
         $vnetAddressSpace = Get-AvailableAddressSpace $virtualNetworkAddressSpaces
@@ -186,7 +188,19 @@ function Add-AzureSMVmToRM
         $resources += $vnetResource
     }
     else {
-        ###### TODO Take care of checking the subnet, and adding it to the resource as necessary
+        # This block of code takes care of checking the subnet, and adding it to the resource as necessary
+		$subnets = @()
+		
+		# Walk through all existing subnets and add them to the vnet resource
+		foreach ($subnet in $currentVnet.Subnets)
+		{
+			$subnetResource = New-VirtualNetworkSubnet -Name $subnet.Name -AddressPrefix $subnet.AddressPrefix -NetworkSecurityGroup $subnet.NetworkSecurityGroup.Id
+			$subnets += $subnetResource
+		}
+
+		# Create a net vnet resource with subnets from the existing vnet
+		$vnetResource = New-VirtualNetworkResource -Name $vnetName -Location '[parameters(''location'')]' -AddressSpacePrefixes @($vnetAddressSpace) -Subnets $subnets
+        $resources += $vnetResource
     }
 
     # Availability set resource
