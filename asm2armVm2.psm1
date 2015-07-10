@@ -56,22 +56,41 @@ function New-VmResource
     {
         
         $winRMListeners = @()
+        $winRm = @{}
+
         $winRmEndpoint = $endpoints | Where-Object {$_.Name -eq "PowerShell"}
         if ($winRmEndpoint -ne $null)
         {
-            $wimRmUrlScheme = ($VM | Azure\Get-AzureWinRMUri).Scheme
+          $wimRmUrlScheme = ($VM | Azure\Get-AzureWinRMUri).Scheme
             
-          
-            $listener = 
+          $listener = @{'protocol' = $winrmUrlScheme}
+          if ($WinRmCertificateName)
+          {
+            $certificateUri = New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName
+            $listener.Add('certificateUrl', $certificateUri)
+          }
 
+          $winRm.Add('listeners', [PSCustomObject] @($listener));
         }
         
-        $windowsConfiguration = @{
+        $windowsConfiguration = [PSCustomObject] @{
                 'provisionVMAgent' = $vm.vm.ProvisionGuestAgent;
-                'winRM' = @{
-                    'listeners' = '';
-                }
+                'winRM' = [PSCustomObject] $winRm;
+                'enableAutomaticUpdates' = $true
             }
+        $osProfile.Add('windowsConfiguration', $windowsConfiguration)
+    }
+    elseif ($VM.vm.OSVirtualHardDisk.OS -eq "Linux")
+    {
+        # We cannot determine if password authentication is disabled or not using ASM 
+        # or if any public keys are used for SSH. So we will just configure SSH in the outer
+        # scope while creating the network security groups.
+    }
+
+    $secrets = @()
+    foreach ($cert in $CertificatesToInstall)
+    {
+        
     }
 }
 
