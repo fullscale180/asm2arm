@@ -189,17 +189,35 @@ function Add-AzureSMVmToRM
     }
     else {
         # This block of code takes care of checking the subnet, and adding it to the resource as necessary
-		$subnets = @()
-		
-		# Walk through all existing subnets and add them to the vnet resource
-		foreach ($subnet in $currentVnet.Subnets)
+		$existingSubnets = @()
+		$newSubnets = @()
+
+		# Obtain the list of all sites associated with the vnet
+		$sites = Azure\Get-AzureVNetSite -VNetName $vnetName
+
+		# Walk through all sites to retrieve and collect their subnets
+		$sites | ForEach-Object { $_.Subnets | ForEach-Object { $existingSubnets += $_ } }
+
+		# Walk through all existing subnets and identify those that are as yet not in the resource group
+		foreach ($subnet in $existingSubnets)
 		{
-			$subnetResource = New-VirtualNetworkSubnet -Name $subnet.Name -AddressPrefix $subnet.AddressPrefix -NetworkSecurityGroup $subnet.NetworkSecurityGroup.Id
-			$subnets += $subnetResource
+			$subnetExists = $false
+			$subnetExists = $currentVnet.Subnets | ForEach-Object { if($subnet.AddressPrefix -eq $_.AddressPrefix) { $subnetExists = $true } }
+
+			# Those subnets that are not currently in the resource group must be included into the Vnet resource
+			if ($subnetExists -eq $false)
+			{
+				# Find out what network security group the existing subnet belongs
+				$subnetSecGroup = Azure\Get-AzureNetworkSecurityGroupForSubnet -VirtualNetworkName $vnetName -SubnetName $subnet.Name
+
+				# Create a new resource entity representing the existing subnet in ARM
+				$subnetResource = New-VirtualNetworkSubnet -Name $subnet.Name -AddressPrefix $subnet.AddressPrefix
+				$newSubnets += $subnetResource
+			}
 		}
 
 		# Create a net vnet resource with subnets from the existing vnet
-		$vnetResource = New-VirtualNetworkResource -Name $vnetName -Location '[parameters(''location'')]' -AddressSpacePrefixes @($vnetAddressSpace) -Subnets $subnets
+		$vnetResource = New-VirtualNetworkResource -Name $vnetName -Location '[parameters(''location'')]' -AddressSpacePrefixes @($vnetAddressSpace) -Subnets $newSubnets
         $resources += $vnetResource
     }
 
