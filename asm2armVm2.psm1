@@ -23,6 +23,8 @@ function New-VmResource
 		[PSCredential]
 		$Credentials, 
 		$NetworkInterfaceName,
+        $StorageAccountName,
+        $Location,
 		$DiskAction,
         $KeyVaultResourceName,
         $KeyVaultVaultName,
@@ -48,8 +50,6 @@ function New-VmResource
 
     $osProfile = @{'computerName' = $vm.Name; 'adminUsername' = $Credentials.UserName; 'adminPassword' = $Credentials.Password}
 
-
-    
     $endpoints = $VM | Azure\Get-AzureEndpoint
 
     if ($VM.vm.OSVirtualHardDisk.OS -eq "Windows")
@@ -66,7 +66,8 @@ function New-VmResource
           $listener = @{'protocol' = $winrmUrlScheme}
           if ($WinRmCertificateName)
           {
-            $certificateUri = New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName
+            $certificateUri = New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName `
+                -CertificateName $(New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName $WinRmCertificateName)
             $listener.Add('certificateUrl', $certificateUri)
           }
 
@@ -87,11 +88,28 @@ function New-VmResource
         # scope while creating the network security groups.
     }
 
-    $secrets = @()
+    $certificateUrls = @()
     foreach ($cert in $CertificatesToInstall)
     {
-        
+        $certificateObject = [PSCustomObject] @{'certificateUrl' = New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName $cert; `
+                                                'certificateStore' = 'My'}
+        $certificateObject += $certificateUrls
     }
+    $secrets = @()
+    $secretsItem = @{'sourceVault' = [PSCustomObject]@{'id' = '[resourceId(parameters(''{0}''), ''Microsoft.KeyVault/vaults'', ''{1}'')]' -f $KeyVaultResourceName, $KeyVaultVaultName}; `
+                        'vaultCertificates' = $certificateUrls}
+
+    $osProfile.Add('secrets', $secrets)
+
+    $properties.Add('osProfile', [PSCustomObject] $osProfile)
+
+    $storageProfile = New-VmStorageProfile -VM $VM -DiskAction $DiskAction -StorageAccountName $StorageAccountName -Location $Location 
+    $properties.Add('storageProfile', [PSCustomObject] $storageProfile)
+
+    $properties.Add('hardwareProfile', [PSCustomObject]@{'vmSize' = $(Get-AzureArmVmSize -Size $vm.VM.RoleSize)})
+
+    $properties.Add('networkProfile', [PSCustomObject] @{'networkInterfaces' = `
+            @([PSCustomObject]@{'id' = '''[resourceId(''Microsoft.Network/networkInterfaces'',{0})]''' -f $NetworkInterfaceName } )})
 }
 
 function Get-AzureArmVmSize 
@@ -159,11 +177,10 @@ function New-KeyVaultCertificaterUri
     Param
     (
         $KeyVaultVaultName,
-        $CertificateName,
-        $CertificateThumprint
+        $CertificateName
     )
 
-    $uri = "https://{0}.vault.azure.net/secrets/{1}/{2}" -f $KeyVaultResourceName, $CertificateName, $CertificateThumprint
+    $uri = "https://{0}.vault.azure.net/keys/{1}" -f $KeyVaultResourceName, $CertificateName
 
     return $uri
 }

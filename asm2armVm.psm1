@@ -17,9 +17,6 @@
 		[string]
 		$StorageAccountName,
 
-		[Parameter(Mandatory=$false, ParameterSetName='Gallery Image')]
-		$ImageName,
-
 		# Location to search the image reference in
 		[Parameter(Mandatory=$false, ParameterSetName='Gallery Image')]
 		$Location
