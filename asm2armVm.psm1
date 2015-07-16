@@ -5,20 +5,18 @@
 		[ValidateSet("KeepDisks", "NewDisks", "CopyDisks")]
 		$DiskAction,
 
-		[Parameter(Mandatory=$true, ParameterSetName='Virtual Machine')]
+		[Parameter(Mandatory=$true)]
 		[ValidateNotNull()]
 		[ValidateNotNullOrEmpty()]
 		[Microsoft.WindowsAzure.Commands.ServiceManagement.Model.PersistentVMRoleContext]
 		$VM,
 
-		[Parameter(Mandatory=$true, ParameterSetName='Storage Account')]
-		[ValidateNotNull()]
-		[ValidateNotNullOrEmpty()]
+		[Parameter(Mandatory=$false)]
 		[string]
 		$StorageAccountName,
 
 		# Location to search the image reference in
-		[Parameter(Mandatory=$false, ParameterSetName='Gallery Image')]
+		[Parameter(Mandatory=$false)]
 		$Location
 	)
 
@@ -76,7 +74,7 @@
 	$osDisk =[PSCustomObject] @{'name' = 'osdisk'; `
 								'osType' = $VM.VM.OSVirtualHardDisk.OS;
 								'vhd'= @{ 'uri' = $osDiskUri };
-								'caching'= 'ReadWrite';
+								'caching'= $vm.vm.OSVirtualHardDisk.HostCaching;
 								'createOption'= $osDiskCreateOption;} 
 
 	# Add the osDisk section to the resource metadata
@@ -100,7 +98,7 @@
 						'diskSizeGB'= $disk.LogicalDiskSizeInGB;
 						'lun'= $disk.Lun;
 						'vhd'= @{ 'Uri' = $dataDiskUri };
-						'caching'= 'ReadWrite';
+						'caching'= $disk.HostCaching;
 						'createOption'= $dataDiskCreateOption; }   
 	}
 

@@ -97,7 +97,26 @@ function Add-AzureSMVmToRM
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
         [string]
-        $WinRmCertificateName
+        $WinRmCertificateName,
+
+        # Folder for the generated template and parameter files
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNull()]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $OutputFileFolder,
+        
+        # File name base for the generated template and parameter files
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNull()]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $OutputFileNameBase,
+
+        # Generate timestamp in the file name or not, default is to generate the timestamp
+        [Parameter(Mandatory=$false)]        
+        [switch]
+        $AppendTimeStampForFiles
     )
 
     if ($psCmdlet.ParameterSetName -eq "Service and VM Name")
@@ -121,7 +140,7 @@ function Add-AzureSMVmToRM
         throw "VM is not present"
     } 
 
-    if (-not $VM.VM.WinRMCertificate -and (-not $KeyVaultResourceName -or -not $KeyVaultVaultName -or -not $WinRmCertificateThumbprint) )
+    if (($VM.VM.WinRMCertificate -ne $null) -and (-not $KeyVaultResourceName -or -not $KeyVaultVaultName -or -not $WinRmCertificateThumbprint) )
     {
         throw ("The VM uses a custom certificate for WinRM. Please upload it to KeyVault, and provide KeyVault resoruce name, vault name in the parameters. Thumbprint of the certificate is {0}" -f $VM.VM.WinRMCertificate)
     }
@@ -193,36 +212,55 @@ function Add-AzureSMVmToRM
 		$newSubnets = @()
 
 		# Obtain the list of all sites associated with the vnet
-		$sites = Azure\Get-AzureVNetSite -VNetName $vnetName
+        $sites = $null
+
+        # Wrapping in try-catch as the commandlet does not implement -ErrorAction SilentlyContinue
+        try
+        {
+    		$sites = Azure\Get-AzureVNetSite -VNetName $vnetName -ErrorAction SilentlyContinue
+        }
+        catch
+        {
+            [System.ArgumentException]
+            # Eat the exception
+        }
 
 		# Walk through all sites to retrieve and collect their subnets
 		$sites | ForEach-Object { $_.Subnets | ForEach-Object { $existingSubnets += $_ } }
+        
+        if ($sites -ne $null)
+        {
+		    # Walk through all existing subnets and identify those that are as yet not in the resource group
+		    foreach ($subnet in $existingSubnets)
+		    {
+			    $subnetExists = $false
+			    $subnetExists = $currentVnet.Subnets | ForEach-Object { if($subnet.AddressPrefix -eq $_.AddressPrefix) { $subnetExists = $true } }
 
-		# Walk through all existing subnets and identify those that are as yet not in the resource group
-		foreach ($subnet in $existingSubnets)
-		{
-			$subnetExists = $false
-			$subnetExists = $currentVnet.Subnets | ForEach-Object { if($subnet.AddressPrefix -eq $_.AddressPrefix) { $subnetExists = $true } }
+			    # Those subnets that are not currently in the resource group must be included into the Vnet resource
+			    if ($subnetExists -eq $false)
+			    {
+				    # Find out what network security group the existing subnet belongs
+				    $subnetSecGroup = AzureResourceManager\Get-AzureNetworkSecurityGroupForSubnet -VirtualNetworkName $vnetName -SubnetName $subnet.Name
 
-			# Those subnets that are not currently in the resource group must be included into the Vnet resource
-			if ($subnetExists -eq $false)
-			{
-				# Find out what network security group the existing subnet belongs
-				$subnetSecGroup = Azure\Get-AzureNetworkSecurityGroupForSubnet -VirtualNetworkName $vnetName -SubnetName $subnet.Name
-
-				# Create a new resource entity representing the existing subnet in ARM
-				$subnetResource = New-VirtualNetworkSubnet -Name $subnet.Name -AddressPrefix $subnet.AddressPrefix
-				$newSubnets += $subnetResource
-			}
-		}
-
-		# Create a net vnet resource with subnets from the existing vnet
-		$vnetResource = New-VirtualNetworkResource -Name $vnetName -Location '[parameters(''location'')]' -AddressSpacePrefixes @($vnetAddressSpace) -Subnets $newSubnets
-        $resources += $vnetResource
+				    # Create a new resource entity representing the existing subnet in ARM
+				    $subnetResource = New-VirtualNetworkSubnet -Name $subnet.Name -AddressPrefix $subnet.AddressPrefix
+				    $newSubnets += $subnetResource
+			    }
+		    }
+        
+    		# Create a net vnet resource with subnets from the existing vnet
+	    	$vnetResource = New-VirtualNetworkResource -Name $vnetName -Location '[parameters(''location'')]' -AddressSpacePrefixes @($vnetAddressSpace) -Subnets $newSubnets
+            $resources += $vnetResource
+        }
+        else
+        {
+            # We have already migrated a VM, that was not in a VNet in ASM, and this is another one, simply put the VM in the same subnet.
+            # So we are not doing anything, but adding this here for explainig the scenrio.
+        }
     }
 
     # Availability set resource
-    if ($VM.AvailabilitySetName -ne "")
+    if ($VM.AvailabilitySetName)
     {
         $availabilitySetResource = New-AvailabilitySetResource -Name $VM.AvailabilitySetName -Location '[parameters(''location'')]'
         $resources += $availabilitySetResource
@@ -252,38 +290,29 @@ function Add-AzureSMVmToRM
 
     # VM
 
-
     $credentials = Get-Credential
 
     $vmResource = New-VmResource -VM $VM -Credentials $credentials -NetworkInterface $nicName -StorageAccountName $storageAccountName -Location '[parameters(''location'')]' `
         -DiskAction $DiskAction -KeyVaultResourceName $KeyVaultResourceName -KeyVaultVaultName $KeyVaultVaultName -CertificatesToInstall $CertificatesToInstall -WinRmCertificateName $WinRmCertificateName
-
-    <#	
-    [Microsoft.WindowsAzure.Commands.ServiceManagement.Model.PersistentVMRoleContext]
-		$VM,
-		[PSCredential]
-		$Credentials, 
-		$NetworkInterfaceName,
-        $StorageAccountName,
-        $Location,
-		$DiskAction,
-        $KeyVaultResourceName,
-        $KeyVaultVaultName,
-        $CertificatesToInstall,
-        $WinRmCertificateName
-        #>
-
     $resources += $vmResource
     
     $parameters = [PSCustomObject] $parametersObject
     
     $template = New-ArmTemplate -Parameters $parameters -Resources $resources
-    $templateFileName =  [IO.Path]::GetTempFileName()
-    $template | Out-File $templateFileName
+    $timestamp = ''
+    if ($AppendTimeStampForFiles.IsPresent)
+    {
+        $timestamp = '-' + $(Get-Date -Format 'yyMMdd-hhmm')
+    }
+
+    $templateFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-template{1}.json' -f $OutputFileNameBase, $timestamp)
+      
+    $template | Out-File $templateFileName -Force
 
     $parametersFile = New-ArmTemplateParameterFile -ParametersList $actualParameters
-    $actualParametersFileName =  [IO.Path]::GetTempFileName()
-    $parametersFile | Out-File $actualParametersFileName
+    $actualParametersFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-parameters{1}.json' -f $OutputFileNameBase, $timestamp)
+
+    $parametersFile | Out-File $actualParametersFileName -Force
 
     $resourceGroup = AzureResourceManager\Get-AzureResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
 

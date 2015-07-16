@@ -110,6 +110,11 @@ function New-VmResource
 
     $properties.Add('networkProfile', [PSCustomObject] @{'networkInterfaces' = `
             @([PSCustomObject]@{'id' = '''[resourceId(''Microsoft.Network/networkInterfaces'',{0})]''' -f $NetworkInterfaceName } )})
+            
+    $resource = New-ResourceTemplate -Type "Microsoft.Compute/virtualMachines" -Name $VM.Name `
+            -Location $Location -ApiVersion $Global:apiVersion -Properties $properties -DependsOn $Dependecies
+
+    return $resource
 }
 
 function Get-AzureArmVmSize 
