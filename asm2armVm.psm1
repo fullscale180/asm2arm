@@ -1,23 +1,17 @@
 ﻿function New-VmStorageProfile 
 {
 	Param (
-		[Parameter(Mandatory=$true)]
-		[ValidateSet("KeepDisks", "NewDisks", "CopyDisks")]
 		$DiskAction,
 
-		[Parameter(Mandatory=$true)]
-		[ValidateNotNull()]
-		[ValidateNotNullOrEmpty()]
 		[Microsoft.WindowsAzure.Commands.ServiceManagement.Model.PersistentVMRoleContext]
 		$VM,
-
-		[Parameter(Mandatory=$false)]
+		
 		[string]
 		$StorageAccountName,
 
 		# Location to search the image reference in
-		[Parameter(Mandatory=$false)]
-		$Location
+		$Location,
+        $ResourceGroupName        
 	)
 
 	$storageProfile = @{}
@@ -62,7 +56,7 @@
 	elseif ($DiskAction -eq "CopyDisks")
 	{
 		# Create a copy of the existing VM disk
-		Copy-VmDisks -VM $VM -StorageAccountName $StorageAccountName
+		Copy-VmDisks -VM $VM -StorageAccountName $StorageAccountName -ResourceGroupName $ResourceGroupName
 	}
 	elseif ($DiskAction -eq "KeepDisks")
 	{
@@ -116,7 +110,8 @@ function Copy-VmDisks
 		$VM,
 
 		[string]
-		$StorageAccountName
+		$StorageAccountName,
+        $ResourceGroupName
 	)
 
 	 $copyScriptBlock = {
@@ -152,7 +147,7 @@ function Copy-VmDisks
 		# We are assuming we will be using the same storage account for all of the destination VM's disks.
 		# However, please make sure to take the storage account's available throughput constraints into account.
 		# Please see https://azure.microsoft.com/en-us/documentation/articles/storage-scalability-targets/ for details
-		$destinationAccountKey = (AzureResourceManager\Get-AzureStorageAccountKey -Name $StorageAccountName).Key1
+		$destinationAccountKey = (AzureResourceManager\Get-AzureStorageAccountKey -Name $StorageAccountName -ResourceGroupName $ResourceGroupName).Key1 
 		$destinationContext = AzureResourceManager\New-AzureStorageContext -StorageAccountName $sourceStorageAccountName -StorageAccountKey $destinationAccountKey
 
 		$vmOsDiskStorageAccountName = ([System.Uri]$VM.VM.OSVirtualHardDisk.MediaLink).Host.Split('.')[0]

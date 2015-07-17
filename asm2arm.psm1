@@ -290,10 +290,9 @@ function Add-AzureSMVmToRM
 
     # VM
 
-    $credentials = Get-Credential
-
-    $vmResource = New-VmResource -VM $VM -Credentials $credentials -NetworkInterface $nicName -StorageAccountName $storageAccountName -Location '[parameters(''location'')]' `
-        -DiskAction $DiskAction -KeyVaultResourceName $KeyVaultResourceName -KeyVaultVaultName $KeyVaultVaultName -CertificatesToInstall $CertificatesToInstall -WinRmCertificateName $WinRmCertificateName
+    $vmResource = New-VmResource -VM $VM -NetworkInterface $nicName -StorageAccountName $storageAccountName -Location '[parameters(''location'')]' `
+        -ResourceGroupName $ResourceGroupName -DiskAction $DiskAction -KeyVaultResourceName $KeyVaultResourceName -KeyVaultVaultName $KeyVaultVaultName `
+        -CertificatesToInstall $CertificatesToInstall -WinRmCertificateName $WinRmCertificateName
     $resources += $vmResource
     
     $parameters = [PSCustomObject] $parametersObject

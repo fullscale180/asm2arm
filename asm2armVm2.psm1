@@ -20,11 +20,10 @@ function New-VmResource
 	(
 		[Microsoft.WindowsAzure.Commands.ServiceManagement.Model.PersistentVMRoleContext]
 		$VM,
-		[PSCredential]
-		$Credentials, 
 		$NetworkInterfaceName,
         $StorageAccountName,
         $Location,
+        $ResourceGroupName,
 		$DiskAction,
         $KeyVaultResourceName,
         $KeyVaultVaultName,
@@ -40,18 +39,14 @@ function New-VmResource
         $properties.Add('availabilitySet', $availabilitySet)
     }
 
-    $vmSize = Get-AzureArmVmSize -Size $VM.InstanceSize
-    $vmStorageProfile = New-VmStorageProfile -DiskAction $DiskAction -VM $VM -StorageAccountName $storageAccountName
-
-    if ($vmStorageProfile -eq $null)
-    {
-        throw 'Cannot build storage profile'
-    }
+    $vmSize = Get-AzureArmVmSize -Size $VM.InstanceSize   
 
     if ($DiskAction -eq 'NewDisks')
     {
         # QUESTION FOR CRP TEAM
         # How to use secure string but not plain text?
+        $credentials = Get-Credential
+
         $osProfile = @{'computername' = $vm.Name; 'adminUsername' = $Credentials.UserName; 'adminPassword' = $Credentials.GetNetworkCredential().Password}
 
         $endpoints = $VM | Azure\Get-AzureEndpoint
@@ -114,7 +109,7 @@ function New-VmResource
         $properties.Add('osProfile', [PSCustomObject] $osProfile)
     }
 
-    $storageProfile = New-VmStorageProfile -VM $VM -DiskAction $DiskAction -StorageAccountName $StorageAccountName -Location $Location 
+    $storageProfile = New-VmStorageProfile -VM $VM -DiskAction $DiskAction -StorageAccountName $StorageAccountName -Location $Location -ResourceGroupName $ResourceGroupName
     $properties.Add('storageProfile', [PSCustomObject] $storageProfile)
 
     $properties.Add('hardwareProfile', [PSCustomObject]@{'vmSize' = $(Get-AzureArmVmSize -Size $vm.VM.RoleSize)})
