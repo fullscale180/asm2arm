@@ -255,7 +255,7 @@ function Add-AzureSMVmToRM
         else
         {
             # We have already migrated a VM, that was not in a VNet in ASM, and this is another one, simply put the VM in the same subnet.
-            # So we are not doing anything, but adding this here for explainig the scenrio.
+            
         }
     }
 
