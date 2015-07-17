@@ -323,5 +323,5 @@ function Add-AzureSMVmToRM
 
     $deploymentName = "{0}_{1}" -f $ServiceName, $Name
 
-    AzureResourceManager\New-AzureResourceGroupDeployment  -ResourceGroupName $ResourceGroupName -Name $deploymentName -TemplateFile $templateFileName -TemplateParameterFile $actualParametersFileName -Location $location
+    AzureResourceManager\New-AzureResourceGroupDeployment  -ResourceGroupName $ResourceGroupName -Name $deploymentName -TemplateFile $templateFileName -TemplateParameterFile $actualParametersFileName -Location $location    
 }

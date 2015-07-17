@@ -34,7 +34,7 @@ function New-VmResource
 
     
     $properties = @{}
-    if ($vm.AvailabilitySetName -ne "")
+    if ($vm.AvailabilitySetName)
     {
         $availabilitySet = [PSCustomObject] @{'id' = '[resourceId(''Microsoft.Compute/availabilitySets'',''{0}'')]' -f $vm.AvailabilitySetName;}
         $properties.Add('availabilitySet', $availabilitySet)
@@ -45,63 +45,74 @@ function New-VmResource
 
     if ($vmStorageProfile -eq $null)
     {
-        throw "Cannot build storage profile"
+        throw 'Cannot build storage profile'
     }
 
-    $osProfile = @{'computerName' = $vm.Name; 'adminUsername' = $Credentials.UserName; 'adminPassword' = $Credentials.Password}
-
-    $endpoints = $VM | Azure\Get-AzureEndpoint
-
-    if ($VM.vm.OSVirtualHardDisk.OS -eq "Windows")
+    if ($DiskAction -eq 'NewDisks')
     {
-        
-        $winRMListeners = @()
-        $winRm = @{}
+        # QUESTION FOR CRP TEAM
+        # How to use secure string but not plain text?
+        $osProfile = @{'computername' = $vm.Name; 'adminUsername' = $Credentials.UserName; 'adminPassword' = $Credentials.GetNetworkCredential().Password}
 
-        $winRmEndpoint = $endpoints | Where-Object {$_.Name -eq "PowerShell"}
-        if ($winRmEndpoint -ne $null)
+        $endpoints = $VM | Azure\Get-AzureEndpoint
+
+        if ($VM.vm.OSVirtualHardDisk.OS -eq "Windows")
         {
-          $wimRmUrlScheme = ($VM | Azure\Get-AzureWinRMUri).Scheme
+            # QUESTION TO CRP TEAM
+            # How to add windowsCOnfiguration property when there is a default WinRM endpoint?
+            <#
+            $winRMListeners = @()
+            $winRm = @{}
+
+            $winRmEndpoint = $endpoints | Where-Object {$_.Name -eq "PowerShell"}
+            if ($winRmEndpoint -ne $null)
+            {
+              $winRmUrlScheme = ($VM | Azure\Get-AzureWinRMUri).Scheme
             
-          $listener = @{'protocol' = $winrmUrlScheme}
-          if ($WinRmCertificateName)
-          {
-            $certificateUri = New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName `
-                -CertificateName $(New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName $WinRmCertificateName)
-            $listener.Add('certificateUrl', $certificateUri)
-          }
+              $listener = @{'protocol' = $winRmUrlScheme}
+              if ($WinRmCertificateName)
+              {
+                $certificateUri = New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName `
+                    -CertificateName $(New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName $WinRmCertificateName)
+                $listener.Add('certificateUrl', $certificateUri)
+              }
 
-          $winRm.Add('listeners', [PSCustomObject] @($listener));
-        }
-        
-        $windowsConfiguration = [PSCustomObject] @{
-                'provisionVMAgent' = $vm.vm.ProvisionGuestAgent;
-                'winRM' = [PSCustomObject] $winRm;
-                'enableAutomaticUpdates' = $true
+              $winRm.Add('listeners', [PSCustomObject] @($listener));
             }
-        $osProfile.Add('windowsConfiguration', $windowsConfiguration)
-    }
-    elseif ($VM.vm.OSVirtualHardDisk.OS -eq "Linux")
-    {
-        # We cannot determine if password authentication is disabled or not using ASM 
-        # or if any public keys are used for SSH. So we will just configure SSH in the outer
-        # scope while creating the network security groups.
-    }
+        
+            $windowsConfiguration = [PSCustomObject] @{
+                    'provisionVMAgent' = $vm.vm.ProvisionGuestAgent;
+                    'winRM' = [PSCustomObject] $winRm;
+                    'enableAutomaticUpdates' = $true
+                }
+            $osProfile.Add('windowsConfiguration', $windowsConfiguration)
+            #>
+        }
+        elseif ($VM.vm.OSVirtualHardDisk.OS -eq "Linux")
+        {
+            # We cannot determine if password authentication is disabled or not using ASM 
+            # or if any public keys are used for SSH. So we will just configure SSH in the outer
+            # scope while creating the network security groups.
+        }
 
-    $certificateUrls = @()
-    foreach ($cert in $CertificatesToInstall)
-    {
-        $certificateObject = [PSCustomObject] @{'certificateUrl' = New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName $cert; `
-                                                'certificateStore' = 'My'}
-        $certificateObject += $certificateUrls
+        $certificateUrls = @()
+        foreach ($cert in $CertificatesToInstall)
+        {
+            $certificateObject = [PSCustomObject] @{'certificateUrl' = New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName $cert; `
+                                                    'certificateStore' = 'My'}
+            $certificateObject += $certificateUrls
+        }
+        $secrets = @()
+        $secretsItem = @{'sourceVault' = [PSCustomObject]@{'id' = '[resourceId(parameters(''{0}''), ''Microsoft.KeyVault/vaults'', ''{1}'')]' -f $KeyVaultResourceName, $KeyVaultVaultName}; `
+                            'vaultCertificates' = $certificateUrls}
+
+        if ($secrets.Count -gt 0)
+        {
+            $osProfile.Add('secrets', $secrets)
+        }
+
+        $properties.Add('osProfile', [PSCustomObject] $osProfile)
     }
-    $secrets = @()
-    $secretsItem = @{'sourceVault' = [PSCustomObject]@{'id' = '[resourceId(parameters(''{0}''), ''Microsoft.KeyVault/vaults'', ''{1}'')]' -f $KeyVaultResourceName, $KeyVaultVaultName}; `
-                        'vaultCertificates' = $certificateUrls}
-
-    $osProfile.Add('secrets', $secrets)
-
-    $properties.Add('osProfile', [PSCustomObject] $osProfile)
 
     $storageProfile = New-VmStorageProfile -VM $VM -DiskAction $DiskAction -StorageAccountName $StorageAccountName -Location $Location 
     $properties.Add('storageProfile', [PSCustomObject] $storageProfile)
@@ -109,10 +120,20 @@ function New-VmResource
     $properties.Add('hardwareProfile', [PSCustomObject]@{'vmSize' = $(Get-AzureArmVmSize -Size $vm.VM.RoleSize)})
 
     $properties.Add('networkProfile', [PSCustomObject] @{'networkInterfaces' = `
-            @([PSCustomObject]@{'id' = '''[resourceId(''Microsoft.Network/networkInterfaces'',{0})]''' -f $NetworkInterfaceName } )})
-            
-    $resource = New-ResourceTemplate -Type "Microsoft.Compute/virtualMachines" -Name $VM.Name `
-            -Location $Location -ApiVersion $Global:apiVersion -Properties $properties -DependsOn $Dependecies
+            @([PSCustomObject]@{'id' = '[resourceId(''Microsoft.Network/networkInterfaces'',''{0}'')]' -f $NetworkInterfaceName } )})
+    
+    $computeResourceProvider = "Microsoft.Compute/virtualMachines"
+    $crpApiVersion = $Global:apiVersion
+    if ($DiskAction -eq 'KeepDisks')
+    {
+        # ARM Compute Resource Provider (CRP) can only be used with Storage Resource Provider (SRP).
+        # Since keep disks uses the classic SRP, we need to use classic CRP.
+        $computeResourceProvider = "Microsoft.ClassicCompute/virtualMachines"
+        $crpApiVersion = $Global:classicResourceApiVersion
+    }            
+
+    $resource = New-ResourceTemplate -Type $computeResourceProvider -Name $VM.Name `
+            -Location $Location -ApiVersion $crpApiVersion -Properties $properties -DependsOn $Dependecies
 
     return $resource
 }
@@ -125,40 +146,40 @@ function Get-AzureArmVmSize
 	)
 
 	$sizes = @{
-	   "ExtraSmall" = "Standard_A0  ";
-	"Small" = "Standard_A1  ";
-	"Medium" = "Standard_A2  ";
-	"Large" = "Standard_A3  ";
-	"ExtraLarge" = "Standard_A4  ";
-	"Basic_A0" = "Basic_A0     ";
-	"Basic_A1" = "Basic_A1     ";
-	"Basic_A2" = "Basic_A2     ";
-	"Basic_A3" = "Basic_A3     ";
-	"Basic_A4" = "Basic_A4     ";
-	"A5" = "Standard_A5  ";
-	"A6" = "Standard_A6  ";
-	"A7" = "Standard_A7  ";
+	     "ExtraSmall" = "Standard_A0";
+	"Small" = "Standard_A1";
+	"Medium" = "Standard_A2";
+	"Large" = "Standard_A3";
+	"ExtraLarge" = "Standard_A4";
+	"Basic_A0" = "Basic_A0";
+	"Basic_A1" = "Basic_A1";
+	"Basic_A2" = "Basic_A2";
+	"Basic_A3" = "Basic_A3";
+	"Basic_A4" = "Basic_A4";
+	"A5" = "Standard_A5";
+	"A6" = "Standard_A6";
+	"A7" = "Standard_A7";
 	"A8" = "Standard_A8";
 	"A9" = "Standard_A9";
 	"A10" = "Standard_A10";
 	"A11" = "Standard_A11";
-	"Standard_D1" = "Standard_D1  ";
-	"Standard_D2" = "Standard_D2  ";
-	"Standard_D3" = "Standard_D3  ";
-	"Standard_D4" = "Standard_D4  ";
-	"Standard_D11" = "Standard_D11 ";
-	"Standard_D12" = "Standard_D12 ";
-	"Standard_D13" = "Standard_D13 ";
-	"Standard_D14" = "Standard_D14 ";
-	"Standard_G1  " = "Standard_G1  ";
-	"Standard_G2  " = "Standard_G2  ";
-	"Standard_G3  " = "Standard_G3  ";
-	"Standard_G4  " = "Standard_G4  ";
-	"Standard_G5  " = "Standard_G5  ";
-	"Standard_DS1 " = "Standard_DS1 ";
-	"Standard_DS2 " = "Standard_DS2 ";
-	"Standard_DS3 " = "Standard_DS3 ";
-	"Standard_DS4 " = "Standard_DS4 ";
+	"Standard_D1" = "Standard_D1";
+	"Standard_D2" = "Standard_D2";
+	"Standard_D3" = "Standard_D3";
+	"Standard_D4" = "Standard_D4";
+	"Standard_D11" = "Standard_D11";
+	"Standard_D12" = "Standard_D12";
+	"Standard_D13" = "Standard_D13";
+	"Standard_D14" = "Standard_D14";
+	"Standard_G1" = "Standard_G1";
+	"Standard_G2" = "Standard_G2";
+	"Standard_G3" = "Standard_G3";
+	"Standard_G4" = "Standard_G4";
+	"Standard_G5" = "Standard_G5";
+	"Standard_DS1 " = "Standard_DS1";
+	"Standard_DS2 " = "Standard_DS2";
+	"Standard_DS3 " = "Standard_DS3";
+	"Standard_DS4 " = "Standard_DS4";
 	"Standard_DS11" = "Standard_DS11";
 	"Standard_DS12" = "Standard_DS12";
 	"Standard_DS13" = "Standard_DS13";
