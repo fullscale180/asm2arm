@@ -116,7 +116,12 @@ function Add-AzureSMVmToRM
         # Generate timestamp in the file name or not, default is to generate the timestamp
         [Parameter(Mandatory=$false)]        
         [switch]
-        $AppendTimeStampForFiles
+        $AppendTimeStampForFiles,
+
+        # Generate the template and parameter files but do not deploy
+        [Parameter(Mandatory=$false)]
+        [switch]
+        $NoDeploy
     )
 
     if ($psCmdlet.ParameterSetName -eq "Service and VM Name")
@@ -313,14 +318,17 @@ function Add-AzureSMVmToRM
 
     $parametersFile | Out-File $actualParametersFileName -Force
 
-    $resourceGroup = AzureResourceManager\Get-AzureResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
-
-    if ($resourceGroup -eq $null)
+    if (-not $NoDeploy.IsPresent)
     {
-        AzureResourceManager\New-AzureResourceGroup -Name $ResourceGroupName -Location $location
+        $resourceGroup = AzureResourceManager\Get-AzureResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
+
+        if ($resourceGroup -eq $null)
+        {
+            AzureResourceManager\New-AzureResourceGroup -Name $ResourceGroupName -Location $location
+        }
+
+        $deploymentName = "{0}_{1}" -f $ServiceName, $Name
+
+        AzureResourceManager\New-AzureResourceGroupDeployment  -ResourceGroupName $ResourceGroupName -Name $deploymentName -TemplateFile $templateFileName -TemplateParameterFile $actualParametersFileName -Location $location    
     }
-
-    $deploymentName = "{0}_{1}" -f $ServiceName, $Name
-
-    AzureResourceManager\New-AzureResourceGroupDeployment  -ResourceGroupName $ResourceGroupName -Name $deploymentName -TemplateFile $templateFileName -TemplateParameterFile $actualParametersFileName -Location $location    
 }
