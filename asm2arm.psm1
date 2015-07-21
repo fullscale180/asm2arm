@@ -61,7 +61,7 @@ function Add-AzureSMVmToRM
         $ResourceGroupName,
 
         [Parameter(Mandatory=$true)]
-        [ValidateSet("KeepDisks", "NewDisks", "CopyDisks")]
+        [ValidateSet("NewDisks", "CopyDisks")]
         $DiskAction,
 
         # In case the VM uses custom certificates, they need to be uploaded to KeyVault
@@ -116,7 +116,12 @@ function Add-AzureSMVmToRM
         # Generate timestamp in the file name or not, default is to generate the timestamp
         [Parameter(Mandatory=$false)]        
         [switch]
-        $AppendTimeStampForFiles
+        $AppendTimeStampForFiles,
+
+        # Kick off a new deployment automatically after generating the ARM template files
+        [Parameter(Mandatory=$false)]        
+        [switch]
+        $Deploy
     )
 
     if ($psCmdlet.ParameterSetName -eq "Service and VM Name")
@@ -174,17 +179,25 @@ function Add-AzureSMVmToRM
                                             -AllowedValues @("East US", "West US", "West Europe", "East Asia", "South East Asia"))) 
     $actualParameters.Add('location', '')
 
+    # Compose an expression that allows capturing the resource location from ARM template parameters
+    $resourceLocation = "[parameters('location')]"
+
     # Resources section
     $resources = @()
+
+    # This varibale gathers all resources that form a setup phase. These include storage accounts, virtual networks, availability sets.
+    $setupResources = @()
 
     if ($DiskAction -eq 'NewDisks' -or $DiskAction -eq 'CopyDisks')
     {
         # Storage account resource
-        $storageAccountName = Get-StorageAccountName -NamePrefix $canonicalSubscriptionName
+        $storageAccountName = Get-StorageAccountName -NamePrefix $canonicalSubscriptionName 
         if (-not $(Azure\Test-AzureName -Storage $storageAccountName))
         {
-            $storageAccountResource = New-StorageAccountResource -Name $storageAccountName -Location '[parameters(''location'')]'
-            $resources += $storageAccountResource
+            Write-Verbose $("Adding a resource definition for {0} storage account" -f $storageAccountName)
+
+            $storageAccountResource = New-StorageAccountResource -Name $storageAccountName -Location $resourceLocation
+            $setupResources += $storageAccountResource
         }
     }
     
@@ -202,9 +215,15 @@ function Add-AzureSMVmToRM
         $virtualNetworkAddressSpaces = AzureResourceManager\Get-AzureVirtualNetwork | %{$_.AddressSpace.AddressPrefixes}
         $vnetAddressSpace = Get-AvailableAddressSpace $virtualNetworkAddressSpaces
         $subnetAddressSpace = Get-FirstSubnet -AddressSpace $vnetAddressSpace
+
+        Write-Verbose $("Adding a resource definition for {0} subnet" -f $Global:asm2armSubnet)
+
         $subnet = New-VirtualNetworkSubnet -Name $Global:asm2armSubnet -AddressPrefix $subnetAddressSpace
-        $vnetResource = New-VirtualNetworkResource -Name $vnetName -Location '[parameters(''location'')]' -AddressSpacePrefixes @($vnetAddressSpace) -Subnets @($subnet)
-        $resources += $vnetResource
+
+        Write-Verbose $("Adding a resource definition for {0} virtual network" -f $vnetName)
+
+        $vnetResource = New-VirtualNetworkResource -Name $vnetName -Location $resourceLocation -AddressSpacePrefixes @($vnetAddressSpace) -Subnets @($subnet)
+        $setupResources += $vnetResource
     }
     else {
         # This block of code takes care of checking the subnet, and adding it to the resource as necessary
@@ -249,21 +268,22 @@ function Add-AzureSMVmToRM
 		    }
         
     		# Create a net vnet resource with subnets from the existing vnet
-	    	$vnetResource = New-VirtualNetworkResource -Name $vnetName -Location '[parameters(''location'')]' -AddressSpacePrefixes @($vnetAddressSpace) -Subnets $newSubnets
-            $resources += $vnetResource
+	    	$vnetResource = New-VirtualNetworkResource -Name $vnetName -Location $resourceLocation -AddressSpacePrefixes @($vnetAddressSpace) -Subnets $newSubnets
+            $setupResources += $vnetResource
         }
         else
         {
             # We have already migrated a VM, that was not in a VNet in ASM, and this is another one, simply put the VM in the same subnet.
-            
         }
     }
 
     # Availability set resource
     if ($VM.AvailabilitySetName)
     {
-        $availabilitySetResource = New-AvailabilitySetResource -Name $VM.AvailabilitySetName -Location '[parameters(''location'')]'
-        $resources += $availabilitySetResource
+        Write-Verbose $("Adding a resource definition for {0} availability set" -f $VM.AvailabilitySetName)
+
+        $availabilitySetResource = New-AvailabilitySetResource -Name $VM.AvailabilitySetName -Location $resourceLocation
+        $setupResources += $availabilitySetResource
     }
 
     $cloudService = Azure\Get-AzureService -ServiceName $VM.ServiceName
@@ -274,7 +294,7 @@ function Add-AzureSMVmToRM
     # Public IP Address resource
     $ipAddressName = '{0}_armpublicip' -f $vmName
     $armDnsName = '{0}arm' -f $ServiceName
-    $publicIPAddressResource = New-PublicIpAddressResource -Name $ipAddressName -Location '[parameters(''location'')]' `
+    $publicIPAddressResource = New-PublicIpAddressResource -Name $ipAddressName -Location $resourceLocation `
         -AllocationMethod 'Dynamic' -DnsName $armDnsName
     $resources += $publicIPAddressResource
     
@@ -283,44 +303,71 @@ function Add-AzureSMVmToRM
     $subnetRef = '[concat(resourceId(''Microsoft.Network/virtualNetworks'',''{0}''),''/subnets/{1}'')]' -f $vnetName, $Global:asm2armSubnet
     $ipAddressDependency = 'Microsoft.Network/publicIPAddresses/{0}' -f $ipAddressName
     $vnetDependency = 'Microsoft.Network/virtualNetworks/{0}' -f $vnetName
-    $dependencies = @( $ipAddressDependency, $vnetDependency)
-    $nicResource = New-NetworkInterfaceResource -Name $nicName -Location '[parameters(''location'')]' `
-        -PublicIpAddressName $ipAddressName -SubnetReference $subnetRef -Dependecies $dependencies
+    
+    $dependencies = @($ipAddressDependency)
+    $nicResource = New-NetworkInterfaceResource -Name $nicName -Location $resourceLocation -PublicIpAddressName $ipAddressName -SubnetReference $subnetRef -Dependecies $dependencies
     $resources += $nicResource
 
     # VM
-
-    $vmResource = New-VmResource -VM $VM -NetworkInterface $nicName -StorageAccountName $storageAccountName -Location '[parameters(''location'')]' `
-        -ResourceGroupName $ResourceGroupName -DiskAction $DiskAction -KeyVaultResourceName $KeyVaultResourceName -KeyVaultVaultName $KeyVaultVaultName `
-        -CertificatesToInstall $CertificatesToInstall -WinRmCertificateName $WinRmCertificateName
+    $nicDependency = 'Microsoft.Network/networkInterfaces/{0}' -f $nicName
+    $vmResource = New-VmResource -VM $VM -NetworkInterface $nicName -StorageAccountName $storageAccountName -Location $resourceLocation `
+                    -ResourceGroupName $ResourceGroupName -DiskAction $DiskAction -KeyVaultResourceName $KeyVaultResourceName -KeyVaultVaultName $KeyVaultVaultName `
+                    -CertificatesToInstall $CertificatesToInstall -WinRmCertificateName $WinRmCertificateName -Dependecies @($nicDependency)
     $resources += $vmResource
     
     $parameters = [PSCustomObject] $parametersObject
     
-    $template = New-ArmTemplate -Parameters $parameters -Resources $resources
+    $setupTemplate = New-ArmTemplate -Parameters $parameters -Resources $setupResources
+    $deployTemplate = New-ArmTemplate -Parameters $parameters -Resources $resources
+    $parametersFile = New-ArmTemplateParameterFile -ParametersList $actualParameters
+    
     $timestamp = ''
     if ($AppendTimeStampForFiles.IsPresent)
     {
         $timestamp = '-' + $(Get-Date -Format 'yyMMdd-hhmm')
     }
 
-    $templateFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-template{1}.json' -f $OutputFileNameBase, $timestamp)
-      
-    $template | Out-File $templateFileName -Force
+    # Construct output file names
+    $setupTemplateFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-setup{1}.json' -f $OutputFileNameBase, $timestamp)
+    $deployTemplateFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-deploy{1}.json' -f $OutputFileNameBase, $timestamp)
+    $parametersFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-parameters{1}.json' -f $OutputFileNameBase, $timestamp)
 
-    $parametersFile = New-ArmTemplateParameterFile -ParametersList $actualParameters
-    $actualParametersFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-parameters{1}.json' -f $OutputFileNameBase, $timestamp)
+    # Dumping the setup resource template content to a file
+    Write-Verbose $("Generating ARM template with setup resources and writing output to {0}" -f $setupTemplateFileName)
+    $($setupTemplate -replace "\\u0027","'") | Out-File $setupTemplateFileName -Force
 
-    $parametersFile | Out-File $actualParametersFileName -Force
+    # Dumping the deployment resource template content to a file
+    Write-Verbose $("Generating ARM template with deployment resources and writing output to {0}" -f $deployTemplateFileName)
+    $($deployTemplate -replace "\\u0027","'") | Out-File $deployTemplateFileName -Force
 
-    $resourceGroup = AzureResourceManager\Get-AzureResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
+    # Dumping the parameters template content to a file
+    Write-Verbose $("Generating ARM template parameters file and writing output to {0}" -f $parametersFileName)
+    $parametersFile | Out-File $parametersFileName -Force
 
-    if ($resourceGroup -eq $null)
+    if($Deploy.IsPresent)
     {
-        AzureResourceManager\New-AzureResourceGroup -Name $ResourceGroupName -Location $location
+        $resourceGroup = AzureResourceManager\Get-AzureResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
+
+        if ($resourceGroup -eq $null)
+        {
+            Write-Verbose $("Creating a new resource group '{0}'" -f $ResourceGroupName)
+            AzureResourceManager\New-AzureResourceGroup -Name $ResourceGroupName -Location $location
+        }
+
+        $deploymentName = "{0}_{1}" -f $ServiceName, $Name
+
+        # Enter the setup phase
+        Write-Verbose $("Setting up a new deployment '{0}' in the resource group '{1}' using template {2}" -f $deploymentName, $ResourceGroupName, $setupTemplateFileName)
+        AzureResourceManager\New-AzureResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Name $deploymentName -TemplateFile $setupTemplateFileName -TemplateParameterFile $parametersFileName -Location $location    
+
+        if ($DiskAction -eq 'CopyDisks')
+        {
+            Write-Verbose $("CopyDisks option was requested - all existing VHDs will now be copied to {0} storage account managed by ARM" -f $storageAccountName)
+            Copy-VmDisks -VM $VM -StorageAccountName $storageAccountName -ResourceGroupName $ResourceGroupName
+        }
+
+        # Enter tha main deployment phase
+        Write-Verbose $("Creating a new deployment '{0}' in the resource group '{1}' using template {2}" -f $deploymentName, $ResourceGroupName, $deployTemplateFileName)
+        AzureResourceManager\New-AzureResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Name $deploymentName -TemplateFile $deployTemplateFileName -TemplateParameterFile $parametersFileName -Location $location    
     }
-
-    $deploymentName = "{0}_{1}" -f $ServiceName, $Name
-
-    AzureResourceManager\New-AzureResourceGroupDeployment  -ResourceGroupName $ResourceGroupName -Name $deploymentName -TemplateFile $templateFileName -TemplateParameterFile $actualParametersFileName -Location $location    
 }

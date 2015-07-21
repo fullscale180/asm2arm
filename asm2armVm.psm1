@@ -56,7 +56,7 @@
 	elseif ($DiskAction -eq "CopyDisks")
 	{
 		# Create a copy of the existing VM disk
-		Copy-VmDisks -VM $VM -StorageAccountName $StorageAccountName -ResourceGroupName $ResourceGroupName
+		# Copy-VmDisks -VM $VM -StorageAccountName $StorageAccountName -ResourceGroupName $ResourceGroupName
 	}
 	elseif ($DiskAction -eq "KeepDisks")
 	{
@@ -113,43 +113,6 @@ function Copy-VmDisks
 		$StorageAccountName,
         $ResourceGroupName
 	)
-
-	 $copyScriptBlock = {
-			param($srcUrl, $srcContext, $srcContainer, $srcBlob, $destContainer, $destBlob, $destContext)
-
-			
-			if ($srcUrl -ne "" -and $srcContext -eq $null)
-			{
-				# We are doing this for each disk url, since they can be on different storage accounts.
-				# Get the source storage account name from the URL the format on the 
-				# blob store should be <storage account name>..blob.core.windows.net
-				$sourceStorageAccountName = ([System.Uri]$srcUrl).Host.Split('.')[0]
-
-				$sourceAccountKey = (Azure\Get-AzureStorageKey -StorageAccountName $sourceStorageAccountName).Primary
-				$srcContext = Azure\New-AzureStorageContext -StorageAccountName $sourceStorageAccountName -StorageAccountKey $sourceAccountKey
-				$root, $container, $blobName = ([System.Uri]$srcUrl).Segments            
-
-				$srcContainer = $container.Replace("/", "")
-
-				# Put the blob name back together again
-				$srcBlob = $blobName -join ""
-			}
-
-			$srcICloudBlob = Azure\Get-AzureStorageBlob -Context $srcContext -Container $srcContainer -Blob $srcBlob
-
-			AzureResourceManager\Start-AzureStorageBlobCopy -Context $srcContext -ICloudBlob $srcICloudBlob.ICloudBlob -DestContext $destContext -DestContainer $destContainer -DestBlob $destBlob
-
-			Get-AzureStorageBlobCopyState -Container $destContainer -Blob $destBlob -WaitForComplete
-
-			Write-Output $("Copying blob {0} to container {1}, " -f $destBlob, $destContainer)
-		}
-
-		# We are assuming we will be using the same storage account for all of the destination VM's disks.
-		# However, please make sure to take the storage account's available throughput constraints into account.
-		# Please see https://azure.microsoft.com/en-us/documentation/articles/storage-scalability-targets/ for details
-		$destinationAccountKey = (AzureResourceManager\Get-AzureStorageAccountKey -Name $StorageAccountName -ResourceGroupName $ResourceGroupName).Key1 
-		$destinationContext = AzureResourceManager\New-AzureStorageContext -StorageAccountName $sourceStorageAccountName -StorageAccountKey $destinationAccountKey
-
 		$vmOsDiskStorageAccountName = ([System.Uri]$VM.VM.OSVirtualHardDisk.MediaLink).Host.Split('.')[0]
 		$diskUrlsToCopy = @($VM.VM.OSVirtualHardDisk.MediaLink.AbsoluteUri)
 		foreach ($disk in $VM.VM.DataVirtualHardDisks)
@@ -160,36 +123,49 @@ function Copy-VmDisks
 		# Prepare a context in case the source storage account is still the same
 		$vmOsDiskStorageAccountKey = (Azure\Get-AzureStorageKey -StorageAccountName $vmOsDiskStorageAccountName).Primary
 		$vmOsDiskStorageContext = Azure\New-AzureStorageContext -StorageAccountName $vmOsDiskStorageAccountName -StorageAccountKey $vmOsDiskStorageAccountKey
-		$root, $container, $blobName = ([System.Uri]$srcUrl).Segments 
 
-		# Prepare destination context 
-
-		$previousStorageAccountName = ""
-		$copyJobs = @()
+		# We are assuming we will be using the same storage account for all of the destination VM's disks.
+		# However, please make sure to take the storage account's available throughput constraints into account.
+		# Please see https://azure.microsoft.com/en-us/documentation/articles/storage-scalability-targets/ for details
+		$destinationAccountKey = (AzureResourceManager\Get-AzureStorageAccountKey -Name $StorageAccountName -ResourceGroupName $ResourceGroupName).Key1 
+		$destinationContext = AzureResourceManager\New-AzureStorageContext -StorageAccountName $StorageAccountName -StorageAccountKey $destinationAccountKey
+		
+		$previousStorageAccountName = ''
 		$destContainerName = $Global:vhdContainerName
 
-		foreach ($url in $diskUrlsToCopy)
+        # Create the destination container (if doesn't already exist)
+        Azure\New-AzureStorageContainer -Context $destinationContext -Name $destContainerName -Permission Off -ErrorAction SilentlyContinue
+
+		foreach ($srcVhdUrl in $diskUrlsToCopy)
 		{
-			$root, $container, $blobName = ([System.Uri]$srcUrl).Segments
+			$root, $rawContainerName, $srcBlobNameParts = ([System.Uri]$srcVhdUrl).Segments
+			$srcAccountName = ([System.Uri]$srcVhdUrl).Host.Split('.')[0] 
+            $srcContainerName = $rawContainerName.Replace("/", "")
+            $destBlobName = $srcBlobNameParts -join ""
 
-			$storageAccountName = ([System.Uri]$url).Host.Split('.')[0] 
-			$parameterList = @()
-			if ($previousStorageAccountName -ne "" -and $StorageAccountName -ne $previousStorageAccountName)
+            # Compose an URL for the target blob
+            $destVhdUrl = Get-NewBlobLocation -SourceBlobUri $srcVhdUrl -StorageAccountName $StorageAccountName -ContainerName $destContainerName
+
+            # Set up the source storage account context in two cases: during the very first iteration and when storage account name changes between URLs
+			if ($previousStorageAccountName -eq '' -or $previousStorageAccountName -ne $srcAccountName)
 			{                
-				$parameterList = @($url, $null, "", "", $destContainerName, $blobName, $destinationContext)
+				$sourceAccountKey = (Azure\Get-AzureStorageKey -StorageAccountName $srcAccountName).Primary
+                $sourceContext = Azure\New-AzureStorageContext -StorageAccountName $srcAccountName -StorageAccountKey $sourceAccountKey
 			}  
-			else {
-				$parameterList = @("", $vmOsDiskStorageContext, $container, $blobName, $destContainerName, $blobName, $destinationContext)
-			}
 
-			$jobName = "Copy blob {0} on container {1}" -f $blobName, $container
+            # Acquire a reference to the blob containing the source VHD
+            $srcCloudBlob = Azure\Get-AzureStorageBlob -Context $sourceContext -Container $srcContainerName -Blob $destBlobName
 
-			$previousStorageAccountName = $StorageAccountName
+            Write-Output $("Copying a VHD from {0} to {1}" -f $srcVhdUrl, $destVhdUrl)
 
-			$copyJobs += Start-Job -ScriptBlock $copyScriptBlock -Name $jobName -ArgumentList $parameterList
+            $blobCopy = AzureResourceManager\Start-AzureStorageBlobCopy -Context $sourceContext -ICloudBlob $srcCloudBlob.ICloudBlob -DestContext $destinationContext -DestContainer $destContainerName -DestBlob $destBlobName
+			
+            # Wait until the blob copy operation complete
+            while(($blobCopy | Get-AzureStorageBlobCopyState).Status -eq "Pending")
+            {
+                Start-Sleep -s 10
+            }
+
+			$previousStorageAccountName = $srcAccountName
 		}
-
-		Wait-Job -Job $copyJobs
-		Receive-Job -Job $copyJobs
-		Remove-Job -Job $copyJobs
 }

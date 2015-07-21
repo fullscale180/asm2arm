@@ -50,3 +50,5 @@ if ($(Get-Module -Name "asm2arm") -ne $null)
     Remove-Module -Name "asm2arm"
 }
 Import-Module $modulePath
+
+Write-Output 'Azure Service Management and Resource Manager modules have been successfully imported.'

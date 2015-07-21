@@ -28,7 +28,9 @@ function New-VmResource
         $KeyVaultResourceName,
         $KeyVaultVaultName,
         $CertificatesToInstall,
-        $WinRmCertificateName
+        $WinRmCertificateName,
+        [string[]]
+        $Dependecies
 	)
 
     
@@ -127,8 +129,7 @@ function New-VmResource
         $crpApiVersion = $Global:classicResourceApiVersion
     }            
 
-    $resource = New-ResourceTemplate -Type $computeResourceProvider -Name $VM.Name `
-            -Location $Location -ApiVersion $crpApiVersion -Properties $properties -DependsOn $Dependecies
+    $resource = New-ResourceTemplate -Type $computeResourceProvider -Name $VM.Name -Location $Location -ApiVersion $crpApiVersion -Properties $properties -DependsOn $Dependecies
 
     return $resource
 }
