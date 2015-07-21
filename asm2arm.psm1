@@ -118,10 +118,17 @@ function Add-AzureSMVmToRM
         [switch]
         $AppendTimeStampForFiles,
 
+<<<<<<< HEAD
         # Kick off a new deployment automatically after generating the ARM template files
         [Parameter(Mandatory=$false)]        
         [switch]
         $Deploy
+=======
+        # Generate the template and parameter files but do not deploy
+        [Parameter(Mandatory=$false)]
+        [switch]
+        $NoDeploy
+>>>>>>> origin/master
     )
 
     if ($psCmdlet.ParameterSetName -eq "Service and VM Name")
@@ -340,6 +347,7 @@ function Add-AzureSMVmToRM
     Write-Verbose $("Generating ARM template with deployment resources and writing output to {0}" -f $deployTemplateFileName)
     $($deployTemplate -replace "\\u0027","'") | Out-File $deployTemplateFileName -Force
 
+<<<<<<< HEAD
     # Dumping the parameters template content to a file
     Write-Verbose $("Generating ARM template parameters file and writing output to {0}" -f $parametersFileName)
     $parametersFile | Out-File $parametersFileName -Force
@@ -369,5 +377,19 @@ function Add-AzureSMVmToRM
         # Enter tha main deployment phase
         Write-Verbose $("Creating a new deployment '{0}' in the resource group '{1}' using template {2}" -f $deploymentName, $ResourceGroupName, $deployTemplateFileName)
         AzureResourceManager\New-AzureResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Name $deploymentName -TemplateFile $deployTemplateFileName -TemplateParameterFile $parametersFileName -Location $location    
+=======
+    if (-not $NoDeploy.IsPresent)
+    {
+        $resourceGroup = AzureResourceManager\Get-AzureResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
+
+        if ($resourceGroup -eq $null)
+        {
+            AzureResourceManager\New-AzureResourceGroup -Name $ResourceGroupName -Location $location
+        }
+
+        $deploymentName = "{0}_{1}" -f $ServiceName, $Name
+
+        AzureResourceManager\New-AzureResourceGroupDeployment  -ResourceGroupName $ResourceGroupName -Name $deploymentName -TemplateFile $templateFileName -TemplateParameterFile $actualParametersFileName -Location $location    
+>>>>>>> origin/master
     }
 }
