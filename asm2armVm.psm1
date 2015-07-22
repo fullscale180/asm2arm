@@ -88,13 +88,26 @@
 			$dataDiskUri = Get-NewBlobLocation -SourceBlobUri $disk.MediaLink.AbsoluteUri -StorageAccountName $StorageAccountName -ContainerName $Global:vhdContainerName
 		}
 
-		$dataDisks += @{'name' = $disk.DiskName; `
-                        # TODO: must figure out why diskSizeGB must not be present when attaching existing disks
-						#'diskSizeGB'= $disk.LogicalDiskSizeInGB;
-						'lun'= $disk.Lun;
-						'vhd'= @{ 'Uri' = $dataDiskUri };
-						'caching'= $disk.HostCaching;
-						'createOption'= $dataDiskCreateOption; }   
+        # Slightly different property sets are required depending on disk action. For instance, diskSizeGB must only be set for new disks.
+        if ($DiskAction -eq "NewDisks")
+        {
+    		$dataDisks += @{'name' = $disk.DiskName; `
+						    'diskSizeGB'= $disk.LogicalDiskSizeInGB;
+						    'lun'= $disk.Lun;
+						    'vhd'= @{ 'Uri' = $dataDiskUri };
+						    'caching'= $disk.HostCaching;
+						    'createOption'= $dataDiskCreateOption; }   
+        }
+        else
+        {
+            $dataDisks += @{'name' = $disk.DiskName; `
+                            # QUESTION TO CRP TEAM
+                            # Why diskSizeGB must not be present when attaching existing disks?
+						    'lun'= $disk.Lun;
+						    'vhd'= @{ 'Uri' = $dataDiskUri };
+						    'caching'= $disk.HostCaching;
+						    'createOption'= $dataDiskCreateOption; }   
+        }
 	}
 
 	# Add the dataDisks section to the resource metadata
