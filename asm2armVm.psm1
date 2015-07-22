@@ -48,7 +48,7 @@
 		$storageProfile.Add('imageReference', $imageReference)    
 
 		# Request that OS data disk is created from base image
-		$dataDiskCreateOption = "FromImage"
+		$osDiskCreateOption = "FromImage"
 		
 		# Request that all data disks are created as empty
 		$dataDiskCreateOption = "Empty"   
@@ -89,7 +89,7 @@
 		}
 
 		$dataDisks += @{'name' = $disk.DiskName; `
-						'diskSizeGB'= $disk.LogicalDiskSizeInGB;
+						#'diskSizeGB'= $disk.LogicalDiskSizeInGB;
 						'lun'= $disk.Lun;
 						'vhd'= @{ 'Uri' = $dataDiskUri };
 						'caching'= $disk.HostCaching;
@@ -113,8 +113,10 @@ function Copy-VmDisks
 		$StorageAccountName,
         $ResourceGroupName
 	)
+        $verboseOutput = ($PSBoundParameters.ContainsKey('Verbose'))
 		$vmOsDiskStorageAccountName = ([System.Uri]$VM.VM.OSVirtualHardDisk.MediaLink).Host.Split('.')[0]
 		$diskUrlsToCopy = @($VM.VM.OSVirtualHardDisk.MediaLink.AbsoluteUri)
+
 		foreach ($disk in $VM.VM.DataVirtualHardDisks)
 		{
 			$diskUrlsToCopy += $disk.MediaLink.AbsoluteUri
@@ -159,11 +161,23 @@ function Copy-VmDisks
             Write-Output $("Copying a VHD from {0} to {1}" -f $srcVhdUrl, $destVhdUrl)
 
             $blobCopy = AzureResourceManager\Start-AzureStorageBlobCopy -Context $sourceContext -ICloudBlob $srcCloudBlob.ICloudBlob -DestContext $destinationContext -DestContainer $destContainerName -DestBlob $destBlobName
+            
+            # Find out what's going on with our copy request
+            $copyState = $blobCopy | Get-AzureStorageBlobCopyState
+
+            # Dump the current state so that we can see it
+            if($verboseOutput) { $copyState }
 			
             # Wait until the blob copy operation complete
-            while(($blobCopy | Get-AzureStorageBlobCopyState).Status -eq "Pending")
+            while($copyState.Status -eq "Pending")
             {
                 Start-Sleep -s 10
+
+                # Ask for the copy operation status again after waiting for a few seconds
+                $copyState = $blobCopy | Get-AzureStorageBlobCopyState
+
+                # Dump the current state so that we can see it
+                if($verboseOutput) { $copyState }
             }
 
 			$previousStorageAccountName = $srcAccountName

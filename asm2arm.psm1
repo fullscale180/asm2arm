@@ -130,7 +130,7 @@ function Add-AzureSMVmToRM
         $VM = Azure\Get-AzureVM -ServiceName $ServiceName -Name $Name -ErrorAction SilentlyContinue -ErrorVariable $lastError
         if ($lastError)
         {
-            $message = "VM with name {0} on service {1} cannot be found. Details are {2}" -f $Name, $ServiceName, $lastError
+            $message = "VM with name '{0}' on service '{1}' cannot be found. Details are {2}" -f $Name, $ServiceName, $lastError
             Write-Error $message
         }
     }
@@ -194,7 +194,7 @@ function Add-AzureSMVmToRM
         $storageAccountName = Get-StorageAccountName -NamePrefix $canonicalSubscriptionName 
         if (-not $(Azure\Test-AzureName -Storage $storageAccountName))
         {
-            Write-Verbose $("Adding a resource definition for {0} storage account" -f $storageAccountName)
+            Write-Verbose $("Adding a resource definition for '{0}' storage account" -f $storageAccountName)
 
             $storageAccountResource = New-StorageAccountResource -Name $storageAccountName -Location $resourceLocation
             $setupResources += $storageAccountResource
@@ -216,11 +216,11 @@ function Add-AzureSMVmToRM
         $vnetAddressSpace = Get-AvailableAddressSpace $virtualNetworkAddressSpaces
         $subnetAddressSpace = Get-FirstSubnet -AddressSpace $vnetAddressSpace
 
-        Write-Verbose $("Adding a resource definition for {0} subnet" -f $Global:asm2armSubnet)
+        Write-Verbose $("Adding a resource definition for '{0}' subnet" -f $Global:asm2armSubnet)
 
         $subnet = New-VirtualNetworkSubnet -Name $Global:asm2armSubnet -AddressPrefix $subnetAddressSpace
 
-        Write-Verbose $("Adding a resource definition for {0} virtual network" -f $vnetName)
+        Write-Verbose $("Adding a resource definition for '{0}' virtual network" -f $vnetName)
 
         $vnetResource = New-VirtualNetworkResource -Name $vnetName -Location $resourceLocation -AddressSpacePrefixes @($vnetAddressSpace) -Subnets @($subnet)
         $setupResources += $vnetResource
@@ -280,7 +280,7 @@ function Add-AzureSMVmToRM
     # Availability set resource
     if ($VM.AvailabilitySetName)
     {
-        Write-Verbose $("Adding a resource definition for {0} availability set" -f $VM.AvailabilitySetName)
+        Write-Verbose $("Adding a resource definition for '{0}' availability set" -f $VM.AvailabilitySetName)
 
         $availabilitySetResource = New-AvailabilitySetResource -Name $VM.AvailabilitySetName -Location $resourceLocation
         $setupResources += $availabilitySetResource
@@ -362,7 +362,7 @@ function Add-AzureSMVmToRM
 
         if ($DiskAction -eq 'CopyDisks')
         {
-            Write-Verbose $("CopyDisks option was requested - all existing VHDs will now be copied to {0} storage account managed by ARM" -f $storageAccountName)
+            Write-Verbose $("CopyDisks option was requested - all existing VHDs will now be copied to '{0}' storage account managed by ARM" -f $storageAccountName)
             Copy-VmDisks -VM $VM -StorageAccountName $storageAccountName -ResourceGroupName $ResourceGroupName
         }
 
