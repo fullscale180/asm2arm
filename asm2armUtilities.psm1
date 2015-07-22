@@ -318,14 +318,14 @@ function Get-FirstAvailableRange
 
 	$remainingRange = ($End - $Start) % $blockSize
 
-	if ($remainingRange > 0) {
+	if ($remainingRange -gt 0) {
 		$Start = ($rangesCount * $blockSize) + 1
 		$uintNetwork = ($start + ($i * $blockSize))
 		$broadcast = ($start + (($i + 1) * $blockSize) - 1)
 		$networkRange = @{'Network' = Get-DecimalIp $uintNetwork; 'Broadcast' = Get-DecimalIp $broadcast; `
 		'Hosts' = ($broadcast - $uintNetwork - 1); 'StartHost' = Get-DecimalIp ($uintNetwork + 1); 'EndHost' = Get-DecimalIp($broadcast - 1); `
 		'BroadcastInt' = $broadcast; 'NetworkInt' = $uintNetwork}
-		$ranges.Add($networkRange)
+        $ranges += $networkRange
 	}
 
 	if($ranges.Count -gt 0)
