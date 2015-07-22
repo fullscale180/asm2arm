@@ -89,6 +89,7 @@
 		}
 
 		$dataDisks += @{'name' = $disk.DiskName; `
+                        # TODO: must figure out why diskSizeGB must not be present when attaching existing disks
 						#'diskSizeGB'= $disk.LogicalDiskSizeInGB;
 						'lun'= $disk.Lun;
 						'vhd'= @{ 'Uri' = $dataDiskUri };
