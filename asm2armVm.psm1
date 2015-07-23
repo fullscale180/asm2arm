@@ -101,8 +101,6 @@
         else
         {
             $dataDisks += @{'name' = $disk.DiskName; `
-                            # QUESTION TO CRP TEAM
-                            # Why diskSizeGB must not be present when attaching existing disks?
 						    'lun'= $disk.Lun;
 						    'vhd'= @{ 'Uri' = $dataDiskUri };
 						    'caching'= $disk.HostCaching;
