@@ -315,10 +315,8 @@ function Add-AzureSMVmToRM
                     -CertificatesToInstall $CertificatesToInstall -WinRmCertificateName $WinRmCertificateName -Dependecies @($nicDependency)
     $resources += $vmResource
     
-    $parameters = [PSCustomObject] $parametersObject
-    
-    $setupTemplate = New-ArmTemplate -Parameters $parameters -Resources $setupResources
-    $deployTemplate = New-ArmTemplate -Parameters $parameters -Resources $resources
+    $setupTemplate = New-ArmTemplate -Parameters $parametersObject -Resources $setupResources
+    $deployTemplate = New-ArmTemplate -Parameters $parametersObject -Resources $resources
     $parametersFile = New-ArmTemplateParameterFile -ParametersList $actualParameters
     
     $timestamp = ''

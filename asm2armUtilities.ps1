@@ -62,7 +62,7 @@ function Get-AzureArmImageRef
 	$skuRanks = @()     
 	foreach ($sku in $skus)
 	{
-		$skuRank = [PSCustomObject] @{
+		$skuRank = @{
 			'Skus' = $sku.Skus;
 			'Offer' = $sku.Offer;
 			'Rank' = 0;
@@ -96,7 +96,7 @@ function Get-AzureArmImageRef
 		if ($imagesForSku.Length -gt 0) {  
 			$latestImage = ($imagesForSku | Sort-Object -Property Version -Descending)[0]
 
-			$images += [PSCustomObject] @{
+			$images += @{
 				'Publisher' = $latestImage.PublisherName
 				'Offer' = $latestImage.Offer;
 				'Skus' = $latestImage.Skus;

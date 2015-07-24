@@ -10,7 +10,7 @@
         $DefaultValue
     )
 
-    $parameterDefinition = @{'type' = $Type; 'metadata' = [PSCustomObject] @{'description' = $Description}}
+    $parameterDefinition = @{'type' = $Type; 'metadata' = @{'description' = $Description}}
 
     if ($AllowedValues)
     {
@@ -22,7 +22,7 @@
         $parameterDefinition.Add('defaultValue', $DefaultValue)
     }
 
-    return [PSCustomObject] $parameterDefinition
+    return $parameterDefinition
   
 }
 
@@ -37,7 +37,6 @@ function New-ResourceTemplate
         $Properties,
         [array]
         $DependsOn,
-        [PSCustomObject]
         $Resources
     )
 
@@ -46,7 +45,7 @@ function New-ResourceTemplate
         "type"=  $Type;
         "apiVersion" = $ApiVersion;
         "location" = $Location;
-        "tags" = [PSCustomObject] @{"deploymentReason" = $Global:deploymentTag;};
+        "tags" = @{"deploymentReason" = $Global:deploymentTag;};
         "properties" = $Properties;
     }
 
@@ -60,7 +59,7 @@ function New-ResourceTemplate
         $template.Add("dependsOn", $DependsOn)
     }
 
-    return [PSCustomObject] $template
+    return $template
 }
 
 function New-ArmTemplate 
@@ -68,13 +67,9 @@ function New-ArmTemplate
     Param
     (
         $Version,
-        [PSCustomObject]
         $Parameters,
-        [PSCustomObject]
         $Variables,
-        [PSCustomObject[]]
         $Resources,
-        [PSCustomObject[]]
         $Outputs
     )
 
@@ -101,8 +96,7 @@ function New-ArmTemplate
        $template.Add("variables", $Variables)
     }
 
-    $templateObject = [PSCustomObject] $template
-    return ConvertTo-Json $templateObject -Depth 15
+    return ConvertTo-Json $template -Depth 15
 }
 
 function New-ArmTemplateParameterFile 
@@ -119,7 +113,6 @@ function New-ArmTemplateParameterFile
         $parameters.Add($key, @{'value' = $ParametersList[$key]})
     }
 
-    $templateObject = [PSCustomObject] $parameters
-    return ConvertTo-Json $templateObject -Depth 15
+    return ConvertTo-Json $parameters -Depth 15
 }
 

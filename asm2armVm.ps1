@@ -39,7 +39,7 @@
 		# Retrieve the ARM Image reference for a given ASM image
 		$armImageReference = Get-AzureArmImageRef -Location $Location -Image $vmImage
 
-		$imageReference =[PSCustomObject] @{'publisher' = $armImageReference.Publisher; `
+		$imageReference = @{'publisher' = $armImageReference.Publisher; `
 											'offer'= $armImageReference.Offer;
 											'sku'= $armImageReference.Skus;
 											'version'= $armImageReference.Version;}  
@@ -65,7 +65,7 @@
 	}
 
 	# Compose OS disk section
-	$osDisk =[PSCustomObject] @{'name' = 'osdisk'; `
+	$osDisk = @{'name' = 'osdisk'; `
 								'osType' = $VM.VM.OSVirtualHardDisk.OS;
 								'vhd'= @{ 'uri' = $osDiskUri };
 								'caching'= $vm.vm.OSVirtualHardDisk.HostCaching;
@@ -109,7 +109,7 @@
 	}
 
 	# Add the dataDisks section to the resource metadata
-	$storageProfile.Add('dataDisks', [PSCustomObject] $dataDisks)  
+	$storageProfile.Add('dataDisks', $dataDisks)  
 
 	return $storageProfile
 }
@@ -203,7 +203,7 @@ function New-AvailabilitySetResource
 		$Location
 	)
 
-	$createProperties = [PSCustomObject] @{}
+	$createProperties = @{}
 
 	$resource = New-ResourceTemplate -Type "Microsoft.Compute/availabilitySets" -Name $Name `
 		-Location $Location -ApiVersion $Global:apiVersion -Properties $createProperties
@@ -234,7 +234,7 @@ function New-VmResource
     $properties = @{}
     if ($vm.AvailabilitySetName)
     {
-        $availabilitySet = [PSCustomObject] @{'id' = '[resourceId(''Microsoft.Compute/availabilitySets'',''{0}'')]' -f $vm.AvailabilitySetName;}
+        $availabilitySet = @{'id' = '[resourceId(''Microsoft.Compute/availabilitySets'',''{0}'')]' -f $vm.AvailabilitySetName;}
         $properties.Add('availabilitySet', $availabilitySet)
     }
 
@@ -271,12 +271,12 @@ function New-VmResource
                 $listener.Add('certificateUrl', $certificateUri)
               }
 
-              $winRm.Add('listeners', [PSCustomObject] @($listener));
+              $winRm.Add('listeners', @($listener));
             }
         
-            $windowsConfiguration = [PSCustomObject] @{
+            $windowsConfiguration = @{
                     'provisionVMAgent' = $vm.vm.ProvisionGuestAgent;
-                    'winRM' = [PSCustomObject] $winRm;
+                    'winRM' = $winRm;
                     'enableAutomaticUpdates' = $true
                 }
             $osProfile.Add('windowsConfiguration', $windowsConfiguration)
@@ -292,12 +292,12 @@ function New-VmResource
         $certificateUrls = @()
         foreach ($cert in $CertificatesToInstall)
         {
-            $certificateObject = [PSCustomObject] @{'certificateUrl' = New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName $cert; `
+            $certificateObject = @{'certificateUrl' = New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName $cert; `
                                                     'certificateStore' = 'My'}
             $certificateObject += $certificateUrls
         }
         $secrets = @()
-        $secretsItem = @{'sourceVault' = [PSCustomObject]@{'id' = '[resourceId(parameters(''{0}''), ''Microsoft.KeyVault/vaults'', ''{1}'')]' -f $KeyVaultResourceName, $KeyVaultVaultName}; `
+        $secretsItem = @{'sourceVault' = @{'id' = '[resourceId(parameters(''{0}''), ''Microsoft.KeyVault/vaults'', ''{1}'')]' -f $KeyVaultResourceName, $KeyVaultVaultName}; `
                             'vaultCertificates' = $certificateUrls}
 
         if ($secrets.Count -gt 0)
@@ -305,16 +305,16 @@ function New-VmResource
             $osProfile.Add('secrets', $secrets)
         }
 
-        $properties.Add('osProfile', [PSCustomObject] $osProfile)
+        $properties.Add('osProfile', $osProfile)
     }
 
     $storageProfile = New-VmStorageProfile -VM $VM -DiskAction $DiskAction -StorageAccountName $StorageAccountName -Location $Location -ResourceGroupName $ResourceGroupName
-    $properties.Add('storageProfile', [PSCustomObject] $storageProfile)
+    $properties.Add('storageProfile', $storageProfile)
 
-    $properties.Add('hardwareProfile', [PSCustomObject]@{'vmSize' = $(Get-AzureArmVmSize -Size $vm.VM.RoleSize)})
+    $properties.Add('hardwareProfile', @{'vmSize' = $(Get-AzureArmVmSize -Size $vm.VM.RoleSize)})
 
-    $properties.Add('networkProfile', [PSCustomObject] @{'networkInterfaces' = `
-            @([PSCustomObject]@{'id' = '[resourceId(''Microsoft.Network/networkInterfaces'',''{0}'')]' -f $NetworkInterfaceName } )})
+    $properties.Add('networkProfile', @{'networkInterfaces' = `
+            @(@{'id' = '[resourceId(''Microsoft.Network/networkInterfaces'',''{0}'')]' -f $NetworkInterfaceName } )})
     
     $computeResourceProvider = "Microsoft.Compute/virtualMachines"
     $crpApiVersion = $Global:apiVersion
