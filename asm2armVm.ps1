@@ -114,7 +114,6 @@
 	return $storageProfile
 }
 
-
 function Copy-VmDisks
 {
 	Param (
@@ -194,4 +193,213 @@ function Copy-VmDisks
 
 			$previousStorageAccountName = $srcAccountName
 		}
+}
+
+function New-AvailabilitySetResource
+{
+	Param
+	(
+		$Name,
+		$Location
+	)
+
+	$createProperties = [PSCustomObject] @{}
+
+	$resource = New-ResourceTemplate -Type "Microsoft.Compute/availabilitySets" -Name $Name `
+		-Location $Location -ApiVersion $Global:apiVersion -Properties $createProperties
+
+	return $resource
+ }
+
+function New-VmResource 
+{
+	Param 
+	(
+		[Microsoft.WindowsAzure.Commands.ServiceManagement.Model.PersistentVMRoleContext]
+		$VM,
+		$NetworkInterfaceName,
+        $StorageAccountName,
+        $Location,
+        $ResourceGroupName,
+		$DiskAction,
+        $KeyVaultResourceName,
+        $KeyVaultVaultName,
+        $CertificatesToInstall,
+        $WinRmCertificateName,
+        [string[]]
+        $Dependecies
+	)
+
+    
+    $properties = @{}
+    if ($vm.AvailabilitySetName)
+    {
+        $availabilitySet = [PSCustomObject] @{'id' = '[resourceId(''Microsoft.Compute/availabilitySets'',''{0}'')]' -f $vm.AvailabilitySetName;}
+        $properties.Add('availabilitySet', $availabilitySet)
+    }
+
+    $vmSize = Get-AzureArmVmSize -Size $VM.InstanceSize   
+
+    if ($DiskAction -eq 'NewDisks')
+    {
+        # QUESTION FOR CRP TEAM
+        # How to use secure string but not plain text?
+        $credentials = Get-Credential
+
+        $osProfile = @{'computername' = $vm.Name; 'adminUsername' = $Credentials.UserName; 'adminPassword' = $Credentials.GetNetworkCredential().Password}
+
+        $endpoints = $VM | Azure\Get-AzureEndpoint
+
+        if ($VM.vm.OSVirtualHardDisk.OS -eq "Windows")
+        {
+            # QUESTION TO CRP TEAM
+            # How to add windowsCOnfiguration property when there is a default WinRM endpoint?
+            <#
+            $winRMListeners = @()
+            $winRm = @{}
+
+            $winRmEndpoint = $endpoints | Where-Object {$_.Name -eq "PowerShell"}
+            if ($winRmEndpoint -ne $null)
+            {
+              $winRmUrlScheme = ($VM | Azure\Get-AzureWinRMUri).Scheme
+            
+              $listener = @{'protocol' = $winRmUrlScheme}
+              if ($WinRmCertificateName)
+              {
+                $certificateUri = New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName `
+                    -CertificateName $(New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName $WinRmCertificateName)
+                $listener.Add('certificateUrl', $certificateUri)
+              }
+
+              $winRm.Add('listeners', [PSCustomObject] @($listener));
+            }
+        
+            $windowsConfiguration = [PSCustomObject] @{
+                    'provisionVMAgent' = $vm.vm.ProvisionGuestAgent;
+                    'winRM' = [PSCustomObject] $winRm;
+                    'enableAutomaticUpdates' = $true
+                }
+            $osProfile.Add('windowsConfiguration', $windowsConfiguration)
+            #>
+        }
+        elseif ($VM.vm.OSVirtualHardDisk.OS -eq "Linux")
+        {
+            # We cannot determine if password authentication is disabled or not using ASM 
+            # or if any public keys are used for SSH. So we will just configure SSH in the outer
+            # scope while creating the network security groups.
+        }
+
+        $certificateUrls = @()
+        foreach ($cert in $CertificatesToInstall)
+        {
+            $certificateObject = [PSCustomObject] @{'certificateUrl' = New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName $cert; `
+                                                    'certificateStore' = 'My'}
+            $certificateObject += $certificateUrls
+        }
+        $secrets = @()
+        $secretsItem = @{'sourceVault' = [PSCustomObject]@{'id' = '[resourceId(parameters(''{0}''), ''Microsoft.KeyVault/vaults'', ''{1}'')]' -f $KeyVaultResourceName, $KeyVaultVaultName}; `
+                            'vaultCertificates' = $certificateUrls}
+
+        if ($secrets.Count -gt 0)
+        {
+            $osProfile.Add('secrets', $secrets)
+        }
+
+        $properties.Add('osProfile', [PSCustomObject] $osProfile)
+    }
+
+    $storageProfile = New-VmStorageProfile -VM $VM -DiskAction $DiskAction -StorageAccountName $StorageAccountName -Location $Location -ResourceGroupName $ResourceGroupName
+    $properties.Add('storageProfile', [PSCustomObject] $storageProfile)
+
+    $properties.Add('hardwareProfile', [PSCustomObject]@{'vmSize' = $(Get-AzureArmVmSize -Size $vm.VM.RoleSize)})
+
+    $properties.Add('networkProfile', [PSCustomObject] @{'networkInterfaces' = `
+            @([PSCustomObject]@{'id' = '[resourceId(''Microsoft.Network/networkInterfaces'',''{0}'')]' -f $NetworkInterfaceName } )})
+    
+    $computeResourceProvider = "Microsoft.Compute/virtualMachines"
+    $crpApiVersion = $Global:apiVersion
+    if ($DiskAction -eq 'KeepDisks')
+    {
+        # ARM Compute Resource Provider (CRP) can only be used with Storage Resource Provider (SRP).
+        # Since keep disks uses the classic SRP, we need to use classic CRP.
+        $computeResourceProvider = "Microsoft.ClassicCompute/virtualMachines"
+        $crpApiVersion = $Global:classicResourceApiVersion
+    }            
+
+    $resource = New-ResourceTemplate -Type $computeResourceProvider -Name $VM.Name -Location $Location -ApiVersion $crpApiVersion -Properties $properties -DependsOn $Dependecies
+
+    return $resource
+}
+
+function Get-AzureArmVmSize 
+{
+	Param 
+	(
+		$Size
+	)
+
+	$sizes = @{
+	     "ExtraSmall" = "Standard_A0";
+	"Small" = "Standard_A1";
+	"Medium" = "Standard_A2";
+	"Large" = "Standard_A3";
+	"ExtraLarge" = "Standard_A4";
+	"Basic_A0" = "Basic_A0";
+	"Basic_A1" = "Basic_A1";
+	"Basic_A2" = "Basic_A2";
+	"Basic_A3" = "Basic_A3";
+	"Basic_A4" = "Basic_A4";
+	"A5" = "Standard_A5";
+	"A6" = "Standard_A6";
+	"A7" = "Standard_A7";
+	"A8" = "Standard_A8";
+	"A9" = "Standard_A9";
+	"A10" = "Standard_A10";
+	"A11" = "Standard_A11";
+	"Standard_D1" = "Standard_D1";
+	"Standard_D2" = "Standard_D2";
+	"Standard_D3" = "Standard_D3";
+	"Standard_D4" = "Standard_D4";
+	"Standard_D11" = "Standard_D11";
+	"Standard_D12" = "Standard_D12";
+	"Standard_D13" = "Standard_D13";
+	"Standard_D14" = "Standard_D14";
+	"Standard_G1" = "Standard_G1";
+	"Standard_G2" = "Standard_G2";
+	"Standard_G3" = "Standard_G3";
+	"Standard_G4" = "Standard_G4";
+	"Standard_G5" = "Standard_G5";
+	"Standard_DS1 " = "Standard_DS1";
+	"Standard_DS2 " = "Standard_DS2";
+	"Standard_DS3 " = "Standard_DS3";
+	"Standard_DS4 " = "Standard_DS4";
+	"Standard_DS11" = "Standard_DS11";
+	"Standard_DS12" = "Standard_DS12";
+	"Standard_DS13" = "Standard_DS13";
+	"Standard_DS14" = "Standard_DS14";
+	"Basic_D1" = "Basic_D1";
+	"Basic_D11" = "Basic_D11";
+	"Basic_D12" = "Basic_D12";
+	"Basic_D13" = "Basic_D13";
+	"Basic_D2" = "Basic_D2";
+	"Basic_D3" = "Basic_D3";
+	"Basic_D4" = "Basic_D4";
+	"Basic_D5" = "Basic_D5";
+	}
+
+	return $sizes[$Size]
+
+}
+
+function New-KeyVaultCertificaterUri
+{
+    Param
+    (
+        $KeyVaultVaultName,
+        $CertificateName
+    )
+
+    $uri = "https://{0}.vault.azure.net/keys/{1}" -f $KeyVaultResourceName, $CertificateName
+
+    return $uri
 }

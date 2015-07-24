@@ -334,11 +334,13 @@ function Add-AzureSMVmToRM
 
     # Dumping the setup resource template content to a file
     Write-Verbose $("Generating ARM template with setup resources and writing output to {0}" -f $setupTemplateFileName)
-    $($setupTemplate -replace "\\u0027","'") | Out-File $setupTemplateFileName -Force
+    $setupTemplate = [regex]::replace($setupTemplate,'\\u[a-fA-F0-9]{4}',{[char]::ConvertFromUtf32(($args[0].Value -replace '\\u','0x'))})
+    $setupTemplate | Out-File $setupTemplateFileName -Force
 
     # Dumping the deployment resource template content to a file
     Write-Verbose $("Generating ARM template with deployment resources and writing output to {0}" -f $deployTemplateFileName)
-    $($deployTemplate -replace "\\u0027","'") | Out-File $deployTemplateFileName -Force
+    $deployTemplate = [regex]::replace($deployTemplate,'\\u[a-fA-F0-9]{4}',{[char]::ConvertFromUtf32(($args[0].Value -replace '\\u','0x'))})
+    $deployTemplate | Out-File $deployTemplateFileName -Force
 
     # Dumping the parameters template content to a file
     Write-Verbose $("Generating ARM template parameters file and writing output to {0}" -f $parametersFileName)
