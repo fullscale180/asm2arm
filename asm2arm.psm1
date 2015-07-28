@@ -314,6 +314,9 @@ function Add-AzureSMVmToRM
                     -ResourceGroupName $ResourceGroupName -DiskAction $DiskAction -KeyVaultResourceName $KeyVaultResourceName -KeyVaultVaultName $KeyVaultVaultName `
                     -CertificatesToInstall $CertificatesToInstall -WinRmCertificateName $WinRmCertificateName -Dependecies @($nicDependency)
     $resources += $vmResource
+
+    # VM extensions (e.g. custom scripts)
+    $resources += New-VmExtensionResources -VM $VM -Location $resourceLocation
     
     $setupTemplate = New-ArmTemplate -Parameters $parametersObject -Resources $setupResources
     $deployTemplate = New-ArmTemplate -Parameters $parametersObject -Resources $resources

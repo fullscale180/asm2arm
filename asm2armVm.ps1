@@ -403,3 +403,32 @@ function New-KeyVaultCertificaterUri
 
     return $uri
 }
+
+#---------------------------------------------------------------------------------------
+# Translates all extensions found on the specified VM into a collection of ARM resources
+#---------------------------------------------------------------------------------------
+function New-VmExtensionResources 
+{
+	Param 
+	(
+		[Microsoft.WindowsAzure.Commands.ServiceManagement.Model.PersistentVMRoleContext]
+		$VM,
+        $Location
+	)
+
+    $resourceType = 'Microsoft.Compute/virtualMachines/extensions'
+    $vmDependency = 'Microsoft.Compute/virtualMachines/{0}' -f $VM.Name
+    $resources = @()
+
+    # Fetch all extensions registered for the VM
+    $extensions = Azure\Get-AzureVMExtension -VM $Vm
+
+    # Walk through all extensions and build a corresponding resource
+    $extensions | ForEach-Object `
+    { 
+        $properties = @{'publisher' = $_.Publisher ; 'type' = $_.ExtensionName; 'typeHandlerVersion' = $_.Version; 'settings' = $(ConvertFrom-Json $_.PublicConfiguration)}
+        $resources += New-ResourceTemplate -Type $resourceType -Name $("{0}/{1}" -f $VM.Name, $_.ExtensionName) -Location $Location -ApiVersion $Global:apiVersion -Properties $properties -DependsOn @($vmDependency) 
+    }
+
+    return $resources
+}
