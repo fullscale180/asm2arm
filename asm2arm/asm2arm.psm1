@@ -333,6 +333,11 @@ function Add-AzureSMVmToRM
     $deployTemplateFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-deploy{1}.json' -f $OutputFileNameBase, $timestamp)
     $parametersFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-parameters{1}.json' -f $OutputFileNameBase, $timestamp)
 
+    if (-not (Test-Path -Path $OutputFileFolder))
+    {
+        New-Item -ItemType Directory -Path $OutputFileFolder
+    }
+
     # Dumping the setup resource template content to a file
     Write-Verbose $("Generating ARM template with setup resources and writing output to {0}" -f $setupTemplateFileName)
     $setupTemplate = [regex]::replace($setupTemplate,'\\u[a-fA-F0-9]{4}',{[char]::ConvertFromUtf32(($args[0].Value -replace '\\u','0x'))})

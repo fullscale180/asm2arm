@@ -26,4 +26,6 @@ else {
    throw "Please make sure Azure PowerShell module is installed."
 }
 
+Import-Module $($scriptDirectory + '\asm2arm')
+
 Write-Output 'Azure Service Management and Resource Manager modules are now ready to service user commands'
