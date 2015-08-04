@@ -5,6 +5,7 @@
 .DESCRIPTION
    Starts with the VM the user provided, discovers the VMs image, then queries the ARM
    VM image catalog, then creates an ARM template to be deployed to the ARM stack.
+   The target VM needs to be in stopped state. If the machine is not stopped, the cmdlet will exit.
 .EXAMPLE
    
 .EXAMPLE
@@ -144,6 +145,13 @@ function Add-AzureSMVmToRM
     {
         throw "VM is not present"
     } 
+
+    if ($vm.PowerState -ne "Stopped")
+    {
+        $vmMessage = "The VM {0} on service {1} needs to be stopped. It's power state is {2}" -f $vm.Name, $vm.ServiceName, $vm.PowerState
+        Write-Error $vmMessage
+        exit
+    }
 
     if (($VM.VM.WinRMCertificate -ne $null) -and (-not $KeyVaultResourceName -or -not $KeyVaultVaultName -or -not $WinRmCertificateThumbprint) )
     {
@@ -366,7 +374,7 @@ function Add-AzureSMVmToRM
 
         # Enter the setup phase
         Write-Verbose $("Setting up a new deployment '{0}' in the resource group '{1}' using template {2}" -f $deploymentName, $ResourceGroupName, $setupTemplateFileName)
-        AzureResourceManager\New-AzureResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Name $deploymentName -TemplateFile $setupTemplateFileName -TemplateParameterFile $parametersFileName -Location $location    
+        AzureResourceManager\New-AzureResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Name $deploymentName -TemplateFile $setupTemplateFileName -TemplateParameterFile $parametersFileName -Location $location
 
         if ($DiskAction -eq 'CopyDisks')
         {
@@ -376,6 +384,6 @@ function Add-AzureSMVmToRM
 
         # Enter tha main deployment phase
         Write-Verbose $("Creating a new deployment '{0}' in the resource group '{1}' using template {2}" -f $deploymentName, $ResourceGroupName, $deployTemplateFileName)
-        AzureResourceManager\New-AzureResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Name $deploymentName -TemplateFile $deployTemplateFileName -TemplateParameterFile $parametersFileName -Location $location    
+        AzureResourceManager\New-AzureResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Name $deploymentName -TemplateFile $deployTemplateFileName -TemplateParameterFile $parametersFileName -Location $location 
     }
 }
