@@ -295,7 +295,7 @@ function Add-AzureSMVmToRM
     }
 
     $cloudService = Azure\Get-AzureService -ServiceName $VM.ServiceName
-    $location= $cloudService.Location
+    $location = $cloudService.Location
     $actualParameters['location'] = $location
     $vmName = '{0}_{1}' -f $ServiceName, $Name
 
@@ -324,7 +324,7 @@ function Add-AzureSMVmToRM
     $resources += $vmResource
 
     # VM extensions (e.g. custom scripts)
-    $resources += New-VmExtensionResources -VM $VM -Location $resourceLocation
+    $resources += New-VmExtensionResources -VM $VM -ServiceLocation $location -ResourceLocation $resourceLocation
     
     $setupTemplate = New-ArmTemplate -Parameters $parametersObject -Resources $setupResources
     $deployTemplate = New-ArmTemplate -Parameters $parametersObject -Resources $resources

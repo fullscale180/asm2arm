@@ -413,21 +413,32 @@ function New-VmExtensionResources
 	(
 		[Microsoft.WindowsAzure.Commands.ServiceManagement.Model.PersistentVMRoleContext]
 		$VM,
-        $Location
+        $ServiceLocation,
+        $ResourceLocation
 	)
 
     $resourceType = 'Microsoft.Compute/virtualMachines/extensions'
     $vmDependency = 'Microsoft.Compute/virtualMachines/{0}' -f $VM.Name
     $resources = @()
 
-    # Fetch all extensions registered for the VM
+    # Fetch all extensions registered for the classic VM
     $extensions = Azure\Get-AzureVMExtension -VM $Vm
 
     # Walk through all extensions and build a corresponding resource
     $extensions | ForEach-Object `
     { 
-        $properties = @{'publisher' = $_.Publisher ; 'type' = $_.ExtensionName; 'typeHandlerVersion' = $_.Version; 'settings' = $(ConvertFrom-Json $_.PublicConfiguration)}
-        $resources += New-ResourceTemplate -Type $resourceType -Name $("{0}/{1}" -f $VM.Name, $_.ExtensionName) -Location $Location -ApiVersion $Global:apiVersion -Properties $properties -DependsOn @($vmDependency) 
+        # Attempt to locate the VM extension in the Resource Manager by performing a lookup
+        $armExtensions = AzureResourceManager\Get-AzureVMExtensionImage -Location $ServiceLocation -PublisherName $_.Publisher -Type $_.ExtensionName -ErrorAction SilentlyContinue
+
+        # Only proceed with adding a new resource if it was found in ARM
+        if($armExtensions -ne $null)
+        {
+            # Resolve the latest version of the current extension
+            $latestExtension = $armExtensions | sort @{Expression={[System.Version]$_.Version}; Ascending=$false} | Select-Object -first 1
+
+            $properties = @{'publisher' = $_.Publisher ; 'type' = $_.ExtensionName; 'typeHandlerVersion' = $latestExtension.Version; 'settings' = $(ConvertFrom-Json $_.PublicConfiguration)}
+            $resources += New-ResourceTemplate -Type $resourceType -Name $("{0}/{1}" -f $VM.Name, $_.ExtensionName) -Location $ResourceLocation -ApiVersion $Global:apiVersion -Properties $properties -DependsOn @($vmDependency) 
+        }
     }
 
     return $resources
