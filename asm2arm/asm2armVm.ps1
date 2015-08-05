@@ -301,8 +301,8 @@ function New-VmResource
 
     $properties.Add('hardwareProfile', @{'vmSize' = $(Get-AzureArmVmSize -Size $vm.VM.RoleSize)})
 
-    $properties.Add('networkProfile', @{'networkInterfaces' = `
-            @(@{'id' = '[resourceId(''Microsoft.Network/networkInterfaces'',''{0}'')]' -f $NetworkInterfaceName } )})
+    $properties.Add('networkProfile', @{'networkInterfaces' = @(@{'id' = '[resourceId(''Microsoft.Network/networkInterfaces'',''{0}'')]' -f $NetworkInterfaceName } ); `
+                                        'inputEndpoints' = Get-AzureVmEndpoints -VM $VM })
     
     $computeResourceProvider = "Microsoft.Compute/virtualMachines"
     $crpApiVersion = $Global:apiVersion
@@ -430,4 +430,19 @@ function New-VmExtensionResources
     }
 
     return $resources
+}
+
+function Get-AzureVmEndpoints
+{
+	Param 
+	(
+		[Microsoft.WindowsAzure.Commands.ServiceManagement.Model.PersistentVMRoleContext]
+		$VM
+	)
+
+    return $VM | Azure\Get-AzureEndpoint | Select-Object @{n='endpointName';e={$_.Name}},`
+                                                         @{n='privatePort';e={$_.LocalPort}},
+                                                         @{n='publicPort';e={$_.Port}},
+                                                         @{n='protocol';e={$_.Protocol}},
+                                                         @{n='enableDirectServerReturn';e={$_.EnableDirectServerReturn}}
 }
