@@ -3,10 +3,11 @@
     Param
     (
         $Name,
-        $Location
+        $Location,
+        $storageAccountType
     )
 
-    $createProperties = @{"accountType" = "Standard_LRS";}
+    $createProperties = @{"accountType" = $storageAccountType;}
     $resource = New-ResourceTemplate -Type "Microsoft.Storage/storageAccounts" -Name $Name `
         -Location $Location -ApiVersion $Global:previewApiVersion -Properties $createProperties
 

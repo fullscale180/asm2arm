@@ -204,7 +204,10 @@ function Add-AzureSMVmToRM
         {
             Write-Verbose $("Adding a resource definition for '{0}' storage account" -f $storageAccountName)
 
-            $storageAccountResource = New-StorageAccountResource -Name $storageAccountName -Location $resourceLocation
+            $vmOsDiskStorageAccountName = ([System.Uri]$VM.VM.OSVirtualHardDisk.MediaLink).Host.Split('.')[0]
+
+            $storageAccount = Azure\Get-AzureStorageAccount -StorageAccountName $vmOsDiskStorageAccountName
+            $storageAccountResource = New-StorageAccountResource -Name $storageAccountName -Location $resourceLocation -StorageAccountType $storageAccount.AccountType
             $setupResources += $storageAccountResource
         }
     }

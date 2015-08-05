@@ -19,3 +19,5 @@ The following test cases are being planned for implementation.
 | 10 | Linux VM in a Vnet and subnet |
 | 11 | Windows VM with a load balanced endpoint |
 | 12 | Windows VM with custom extensions |
+| 13 | Windows VM in an availability set |
+| 14 | Windows VM in an availability set, with multiple data disks, a public endpoint, in a vnet and subnet, on a load balanced endpoint with custom extensions |
