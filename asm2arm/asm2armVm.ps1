@@ -173,23 +173,11 @@ function Copy-VmDisks
 
             $blobCopy = AzureResourceManager\Start-AzureStorageBlobCopy -Context $sourceContext -ICloudBlob $srcCloudBlob.ICloudBlob -DestContext $destinationContext -DestContainer $destContainerName -DestBlob $destBlobName
             
-            # Find out what's going on with our copy request
-            $copyState = $blobCopy | Get-AzureStorageBlobCopyState
+            # Find out what's going on with our copy request and block
+            $copyState = $blobCopy | Get-AzureStorageBlobCopyState -WaitForComplete
 
             # Dump the current state so that we can see it
-            if($verboseOutput) { $copyState }
-			
-            # Wait until the blob copy operation complete
-            while($copyState.Status -eq "Pending")
-            {
-                Start-Sleep -s 10
-
-                # Ask for the copy operation status again after waiting for a few seconds
-                $copyState = $blobCopy | Get-AzureStorageBlobCopyState
-
-                # Dump the current state so that we can see it
-                if($verboseOutput) { $copyState }
-            }
+            if($verboseOutput) { $copyState }		
 
 			$previousStorageAccountName = $srcAccountName
 		}

@@ -150,7 +150,7 @@ function Add-AzureSMVmToRM
     {
         $vmMessage = "The VM {0} on service {1} needs to be stopped. It's power state is {2}" -f $vm.Name, $vm.ServiceName, $vm.PowerState
         Write-Error $vmMessage
-        exit
+        return
     }
 
     if (($VM.VM.WinRMCertificate -ne $null) -and (-not $KeyVaultResourceName -or -not $KeyVaultVaultName -or -not $WinRmCertificateThumbprint) )
