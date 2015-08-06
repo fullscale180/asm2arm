@@ -422,7 +422,13 @@ function New-VmExtensionResources
             # Resolve the latest version of the current extension
             $latestExtension = $armExtensions | sort @{Expression={[System.Version]$_.Version}; Ascending=$false} | Select-Object -first 1
 
-            $properties = @{'publisher' = $_.Publisher ; 'type' = $_.ExtensionName; 'typeHandlerVersion' = $latestExtension.Version; 'settings' = $(ConvertFrom-Json $_.PublicConfiguration)}
+            # Normalize the version number so that only major and minor components are present
+            $latestVersion = $latestExtension.Version.Replace('.0.0', '')
+
+            # Compose extension properties
+            $properties = @{'publisher' = $_.Publisher ; 'type' = $_.ExtensionName; 'typeHandlerVersion' = $latestVersion; 'settings' = $(ConvertFrom-Json $_.PublicConfiguration)}
+
+            # Create an ARM resource representing the VM extension
             $resources += New-ResourceTemplate -Type $resourceType -Name $("{0}/{1}" -f $VM.Name, $_.ExtensionName) -Location $ResourceLocation -ApiVersion $Global:apiVersion -Properties $properties -DependsOn @($vmDependency) 
         }
     }
@@ -438,7 +444,11 @@ function Get-AzureVmEndpoints
 		$VM
 	)
 
-    return $VM | Azure\Get-AzureEndpoint | Select-Object @{n='endpointName';e={$_.Name}},`
+    # Report all load balanced endpoints to the user so that they know that we do not currently handle these endpoints
+    $VM | Azure\Get-AzureEndpoint | Where-Object {$_.LBSetName -ne $null} | ForEach-Object { Write-Warning $("Endpoint {0} is skipped as load balanced endpoints are NOT currently supported by this cmdlet. You can still manually recreate this endpoint in ARM using the following details: {1}" -f $_.Name, $(ConvertTo-Json $_)) }
+
+    # Walk through all endpoints and filter those that are assigned to a load balancer set (we do not currently handle these endpoints)
+    return $VM | Azure\Get-AzureEndpoint | Where-Object {$_.LBSetName -eq $null} | Select-Object @{n='endpointName';e={$_.Name}},`
                                                          @{n='privatePort';e={$_.LocalPort}},
                                                          @{n='publicPort';e={$_.Port}},
                                                          @{n='protocol';e={$_.Protocol}},
