@@ -24,4 +24,4 @@ The _Add-AzureSMVmToRM_ cmdlet was validated using the following test cases:
 Notes, Known Issues & Limitations
 --------
 - Load balanced endpoints are not currently supported. These must be migrated manually for now.
-- To migrate multiple VMs, invoke the _Add-AzureSMVmToRM_ cmdlet iteratively from within a recursion block.
+- To migrate multiple VMs, invoke the _Add-AzureSMVmToRM_ cmdlet iteratively from within a loop.
