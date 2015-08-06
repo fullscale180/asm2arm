@@ -8,7 +8,7 @@
 #>
 function Get-AzureArmImageRef
 {
-	[CmdletBinding()]
+    [OutputType([PSCustomObject])]
 	Param
 	(
 		# Location to search the image reference in
@@ -62,7 +62,7 @@ function Get-AzureArmImageRef
 	$skuRanks = @()     
 	foreach ($sku in $skus)
 	{
-		$skuRank = @{
+		$skuRank = [PSCustomObject] @{
 			'Skus' = $sku.Skus;
 			'Offer' = $sku.Offer;
 			'Rank' = 0;
@@ -83,20 +83,20 @@ function Get-AzureArmImageRef
 	$maximumRank = ($skuRanks | Measure-Object -Maximum Rank).Maximum
 	$skusWithMaximumRank = $skuRanks | Where-Object {$_.Rank -eq $maximumRank}
 
-	if ($skusWithMaximumRank.length -eq 0)
+	if (-not $skusWithMaximumRank)
 	{
 		return $null
 	}
 
 	$images = @()
-	$optionCount = 0
+	$optionCount = 1
 	foreach ($imageSku in $skusWithMaximumRank)
 	{
 		$imagesForSku = AzureResourceManager\Get-AzureVMImage -Location $Location -PublisherName $publisher -Offer $imageSku.Offer -Skus $imageSku.Skus -ErrorAction SilentlyContinue
 		if ($imagesForSku.Length -gt 0) {  
 			$latestImage = ($imagesForSku | Sort-Object -Property Version -Descending)[0]
 
-			$images += @{
+			$images += [PsCustomObject] @{
 				'Publisher' = $latestImage.PublisherName
 				'Offer' = $latestImage.Offer;
 				'Skus' = $latestImage.Skus;
@@ -109,11 +109,11 @@ function Get-AzureArmImageRef
 
 	if ($images.Length -gt 0)
 	{
-		Write-Output "Found the following potential images:"
+		Write-Host "Found the following potential images:"
 		$images | Select-Object Option, Publisher, Offer, Skus, Version | Format-Table -AutoSize -Force | Out-Host
 		$option = Read-Host -Prompt "Please type in the Option number and press Enter"
 
-		return $images[$option]
+        return $images[$option - 1]
 	}
 
 	if ($skusWithMaximumRank.length -eq 0)

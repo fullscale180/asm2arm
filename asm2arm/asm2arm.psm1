@@ -186,9 +186,20 @@ function Add-AzureSMVmToRM
     $parametersObject.Add('location', $(New-ArmTemplateParameter -Type "string" -Description "location where the resources are going to be deployed to" `
                                             -AllowedValues @("East US", "West US", "West Europe", "East Asia", "South East Asia"))) 
     $actualParameters.Add('location', '')
-
+    
     # Compose an expression that allows capturing the resource location from ARM template parameters
     $resourceLocation = "[parameters('location')]"
+
+    if ($DiskAction -eq 'NewDisks')
+    {
+        $credentials = Get-Credential
+        $parametersObject.Add('adminUser', $(New-ArmTemplateParameter -Type "string" -Description "Administrator user name")) 
+        $actualParameters.Add('adminUser', $credentials.UserName)
+        
+
+        $parametersObject.Add('adminPassword', $(New-ArmTemplateParameter -Type "string" -Description "Administrator user password")) 
+        $actualParameters.Add('adminPassword', $credentials.GetNetworkCredential().Password);
+    }
 
     # Resources section
     $resources = @()
@@ -251,8 +262,9 @@ function Add-AzureSMVmToRM
         }
         catch
         {
-            [System.ArgumentException]
+            [System.ArgumentException] | Out-Null
             # Eat the exception
+            $_.Exception | Out-Null
         }
 
 		# Walk through all sites to retrieve and collect their subnets
@@ -321,7 +333,8 @@ function Add-AzureSMVmToRM
 
     # VM
     $nicDependency = 'Microsoft.Network/networkInterfaces/{0}' -f $nicName
-    $vmResource = New-VmResource -VM $VM -NetworkInterface $nicName -StorageAccountName $storageAccountName -Location $resourceLocation `
+
+    $vmResource = New-VmResource -VM $VM -NetworkInterface $nicName -StorageAccountName $storageAccountName -Location $resourceLocation -LocationValue $location `
                     -ResourceGroupName $ResourceGroupName -DiskAction $DiskAction -KeyVaultResourceName $KeyVaultResourceName -KeyVaultVaultName $KeyVaultVaultName `
                     -CertificatesToInstall $CertificatesToInstall -WinRmCertificateName $WinRmCertificateName -Dependecies @($nicDependency)
     $resources += $vmResource

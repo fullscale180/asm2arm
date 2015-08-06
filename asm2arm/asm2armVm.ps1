@@ -26,7 +26,8 @@
 	if ($DiskAction -eq "NewDisks")
 	{
 		# Find the VMs image on the catalog
-		$vmImage = Azure\Get-AzureVMImage -ImageName $ImageName -ErrorAction SilentlyContinue -ErrorVariable $lastError
+        $ImageName = $vm.vm.OSVirtualHardDisk.SourceImageName
+		$vmImage = Azure\Get-AzureVMImage -ImageName $ImageName -ErrorAction SilentlyContinue
 
 		if (-not $vmImage)
 		{
@@ -37,7 +38,7 @@
 		}
 
 		# Retrieve the ARM Image reference for a given ASM image
-		$armImageReference = Get-AzureArmImageRef -Location $Location -Image $vmImage
+		$armImageReference = Get-AzureArmImageRef -Location $Location -Image $vmImage 
 
 		$imageReference = @{'publisher' = $armImageReference.Publisher; `
 											'offer'= $armImageReference.Offer;
@@ -66,7 +67,6 @@
 
 	# Compose OS disk section
 	$osDisk = @{'name' = 'osdisk'; `
-								'osType' = $VM.VM.OSVirtualHardDisk.OS;
 								'vhd'= @{ 'uri' = $osDiskUri };
 								'caching'= $vm.vm.OSVirtualHardDisk.HostCaching;
 								'createOption'= $osDiskCreateOption;} 
@@ -208,6 +208,7 @@ function New-VmResource
 		$NetworkInterfaceName,
         $StorageAccountName,
         $Location,
+        $LocationValue,
         $ResourceGroupName,
 		$DiskAction,
         $KeyVaultResourceName,
@@ -229,12 +230,9 @@ function New-VmResource
     $vmSize = Get-AzureArmVmSize -Size $VM.InstanceSize   
 
     if ($DiskAction -eq 'NewDisks')
-    {
-        # QUESTION FOR CRP TEAM
-        # How to use secure string but not plain text?
-        $credentials = Get-Credential
-
-        $osProfile = @{'computername' = $vm.Name; 'adminUsername' = $Credentials.UserName; 'adminPassword' = $Credentials.GetNetworkCredential().Password}
+    {           
+        $osProfile = @{'computername' = $vm.Name; 'adminUsername' = "[parameters('adminUser')]" ; `
+            'adminPassword' = "[parameters('adminPassword')]"}
 
         $endpoints = $VM | Azure\Get-AzureEndpoint
 
@@ -296,7 +294,7 @@ function New-VmResource
         $properties.Add('osProfile', $osProfile)
     }
 
-    $storageProfile = New-VmStorageProfile -VM $VM -DiskAction $DiskAction -StorageAccountName $StorageAccountName -Location $Location -ResourceGroupName $ResourceGroupName
+    $storageProfile = New-VmStorageProfile -VM $VM -DiskAction $DiskAction -StorageAccountName $StorageAccountName -Location $LocationValue -ResourceGroupName $ResourceGroupName
     $properties.Add('storageProfile', $storageProfile)
 
     $properties.Add('hardwareProfile', @{'vmSize' = $(Get-AzureArmVmSize -Size $vm.VM.RoleSize)})
