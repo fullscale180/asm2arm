@@ -424,7 +424,13 @@ function New-VmExtensionResources
             # Resolve the latest version of the current extension
             $latestExtension = $armExtensions | sort @{Expression={[System.Version]$_.Version}; Ascending=$false} | Select-Object -first 1
 
-            $properties = @{'publisher' = $_.Publisher ; 'type' = $_.ExtensionName; 'typeHandlerVersion' = $latestExtension.Version; 'settings' = $(ConvertFrom-Json $_.PublicConfiguration)}
+            # Normalize the version number so that only major and minor components are present
+            $latestVersion = $latestExtension.Version.Replace('.0.0', '')
+
+            # Compose extension properties
+            $properties = @{'publisher' = $_.Publisher ; 'type' = $_.ExtensionName; 'typeHandlerVersion' = $latestVersion; 'settings' = $(ConvertFrom-Json $_.PublicConfiguration)}
+
+            # Create an ARM resource representing the VM extension
             $resources += New-ResourceTemplate -Type $resourceType -Name $("{0}/{1}" -f $VM.Name, $_.ExtensionName) -Location $ResourceLocation -ApiVersion $Global:apiVersion -Properties $properties -DependsOn @($vmDependency) 
         }
     }
