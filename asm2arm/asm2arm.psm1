@@ -172,6 +172,9 @@ function Add-AzureSMVmToRM
         }
     }
 
+    $cloudService = Azure\Get-AzureService -ServiceName $VM.ServiceName
+    $location = $cloudService.Location
+
     $currentSubscription = AzureResourceManager\Get-AzureSubscription -Current
     
     # Generate a canonical subscription name to use as the stem for other names
@@ -210,7 +213,7 @@ function Add-AzureSMVmToRM
     if ($DiskAction -eq 'NewDisks' -or $DiskAction -eq 'CopyDisks')
     {
         # Storage account resource
-        $storageAccountName = Get-StorageAccountName -NamePrefix $canonicalSubscriptionName 
+        $storageAccountName = Get-StorageAccountName -NamePrefix $canonicalSubscriptionName  -Location $location
         if (-not $(Azure\Test-AzureName -Storage $storageAccountName))
         {
             Write-Verbose $("Adding a resource definition for '{0}' storage account" -f $storageAccountName)
@@ -309,8 +312,6 @@ function Add-AzureSMVmToRM
         $setupResources += $availabilitySetResource
     }
 
-    $cloudService = Azure\Get-AzureService -ServiceName $VM.ServiceName
-    $location = $cloudService.Location
     $actualParameters['location'] = $location
     $vmName = '{0}_{1}' -f $ServiceName, $Name
 
@@ -340,7 +341,7 @@ function Add-AzureSMVmToRM
     $resources += $vmResource
 
     # VM extensions (e.g. custom scripts)
-    $resources += New-VmExtensionResources -VM $VM -ServiceLocation $location -ResourceLocation $resourceLocation
+    $imperativeScript = New-VmExtensionResources -VM $VM -ServiceLocation $location -ResourceGroupName $ResourceGroupName
     
     $setupTemplate = New-ArmTemplate -Parameters $parametersObject -Resources $setupResources
     $deployTemplate = New-ArmTemplate -Parameters $parametersObject -Resources $resources
@@ -356,6 +357,7 @@ function Add-AzureSMVmToRM
     $setupTemplateFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-setup{1}.json' -f $OutputFileNameBase, $timestamp)
     $deployTemplateFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-deploy{1}.json' -f $OutputFileNameBase, $timestamp)
     $parametersFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-parameters{1}.json' -f $OutputFileNameBase, $timestamp)
+    $imperativeScriptFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-setextensions{1}.json' -f $OutputFileNameBase, $timestamp)
 
     if (-not (Test-Path -Path $OutputFileFolder))
     {
@@ -376,6 +378,10 @@ function Add-AzureSMVmToRM
     Write-Verbose $("Generating ARM template parameters file and writing output to {0}" -f $parametersFileName)
     $parametersFile | Out-File $parametersFileName -Force
 
+    # Dumping the imperative script content to a file
+    Write-Verbose $("Generating imperative script file and writing output to {0}" -f $imperativeScriptFileName)
+    $imperativeScript | Out-File $imperativeScriptFileName -Force
+
     if($Deploy.IsPresent)
     {
         $resourceGroup = AzureResourceManager\Get-AzureResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
@@ -385,7 +391,16 @@ function Add-AzureSMVmToRM
             Write-Verbose $("Creating a new resource group '{0}'" -f $ResourceGroupName)
             AzureResourceManager\New-AzureResourceGroup -Name $ResourceGroupName -Location $location
         }
-
+        else
+        {
+            $canonicalizedLocation = $location.Replace(' ', '').ToLower()
+            if ($resourceGroup.Location -ne $canonicalizedLocation)
+            {
+                $message = "Cannot deploy the VM at location {0} to the resource group {1} at location {2}, please specifiy a new resource group name in the VMs region." -f $location, $ResourceGroupName, $resourceGroup.Location
+                throw $message
+            }
+        }
+        
         $deploymentName = "{0}_{1}" -f $ServiceName, $Name
 
         # Enter the setup phase
@@ -400,6 +415,8 @@ function Add-AzureSMVmToRM
 
         # Enter tha main deployment phase
         Write-Verbose $("Creating a new deployment '{0}' in the resource group '{1}' using template {2}" -f $deploymentName, $ResourceGroupName, $deployTemplateFileName)
-        AzureResourceManager\New-AzureResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Name $deploymentName -TemplateFile $deployTemplateFileName -TemplateParameterFile $parametersFileName -Location $location 
+        $deploymentResult = AzureResourceManager\New-AzureResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Name $deploymentName -TemplateFile $deployTemplateFileName -TemplateParameterFile $parametersFileName -Location $location 
+
+        Invoke-Expression -Command $imperativeScript
     }
 }

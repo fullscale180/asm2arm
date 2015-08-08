@@ -129,7 +129,8 @@ function Get-StorageAccountName
 	[OutputType([string])]
 	Param
 	(
-		$NamePrefix
+		$NamePrefix,
+        $Location
 	)
 
 	# Decide if we need to create a storage account
@@ -148,20 +149,24 @@ function Get-StorageAccountName
 		{
 			# Get-AzureStorageAccount -Name <name> always returns all of the V2 storage accounts on the subscription
 			# at this time. Use a workaround to bring the accounts to an array and check instead.
-            $storageAccounts = @()
-			$storageAccounts += AzureResourceManager\Get-AzureStorageAccount | Select-Object Name
+            $storageAccounts = AzureResourceManager\Get-AzureStorageAccount 
+            $existingStorageAccount = $storageAccounts | Where-Object {$_.Name -eq $storageAccountName}
 		
-			if ($storageAccounts.Contains($storageAccountName))
+			if ($existingStorageAccount)
 			{
 				# If we are here, this is a storage account on this subscription, and using V2
-				$retryStorageAccountName = $false
+				$retryStorageAccountName = ($existingStorageAccount.Location -ne $Location)
 			} 
 			else
 			{
 				# If we are here, that means, storage account exists but some other subscription has it
-				$retryStorageAccountName = $true
-				$storageAccountName = "{0}{1:00}arm" -f $NamePrefix.Substring(0,[math]::Min(18, $NamePrefix.Length-1)), $index++
+				$retryStorageAccountName = $true			
 			}
+
+            if ($retryStorageAccountName)
+            {
+   	            $storageAccountName = "{0}{1:00}arm" -f $NamePrefix.Substring(0,[math]::Min(18, $NamePrefix.Length-1)), $index++
+            }
 		}
 		else
 		{

@@ -140,7 +140,16 @@ function Copy-VmDisks
 		# We are assuming we will be using the same storage account for all of the destination VM's disks.
 		# However, please make sure to take the storage account's available throughput constraints into account.
 		# Please see https://azure.microsoft.com/en-us/documentation/articles/storage-scalability-targets/ for details
-		$destinationAccountKey = (AzureResourceManager\Get-AzureStorageAccountKey -Name $StorageAccountName -ResourceGroupName $ResourceGroupName).Key1 
+        $armStorageAccount = AzureResourceManager\Get-AzureStorageAccount | Where-Object {$_.Name -eq $StorageAccountName} 
+
+        # Check if we can actually find the storage account. If we are here, it should be either crated in this run, or earlier.
+        if (-not $armStorageAccount)
+        {
+            $message = "Cannot find a storage account with name {0} on the subscription's ARM stack." -f $StorageAccountName
+            throw $message
+        }
+
+		$destinationAccountKey = (AzureResourceManager\Get-AzureStorageAccountKey -Name $StorageAccountName -ResourceGroupName $armStorageAccount.ResourceGroupName).Key1 
 		$destinationContext = AzureResourceManager\New-AzureStorageContext -StorageAccountName $StorageAccountName -StorageAccountKey $destinationAccountKey
 		
 		$previousStorageAccountName = ''
@@ -400,40 +409,41 @@ function New-VmExtensionResources
 		[Microsoft.WindowsAzure.Commands.ServiceManagement.Model.PersistentVMRoleContext]
 		$VM,
         $ServiceLocation,
-        $ResourceLocation
+        $ResourceGroupName
+
 	)
 
     $resourceType = 'Microsoft.Compute/virtualMachines/extensions'
     $vmDependency = 'Microsoft.Compute/virtualMachines/{0}' -f $VM.Name
-    $resources = @()
+    $imperativeSetExtensions = @()
 
     # Fetch all extensions registered for the classic VM
     $extensions = Azure\Get-AzureVMExtension -VM $Vm
 
     # Walk through all extensions and build a corresponding resource
-    $extensions | ForEach-Object `
-    { 
+    foreach ($extension in $extensions)
+    {
         # Attempt to locate the VM extension in the Resource Manager by performing a lookup
-        $armExtensions = AzureResourceManager\Get-AzureVMExtensionImage -Location $ServiceLocation -PublisherName $_.Publisher -Type $_.ExtensionName -ErrorAction SilentlyContinue
+        $armExtensions = AzureResourceManager\Get-AzureVMExtensionImage -Location $ServiceLocation -PublisherName $extension.Publisher -Type $extension.ExtensionName -ErrorAction SilentlyContinue
 
         # Only proceed with adding a new resource if it was found in ARM
         if($armExtensions -ne $null)
         {
             # Resolve the latest version of the current extension
-            $latestExtension = $armExtensions | sort @{Expression={[System.Version]$_.Version}; Ascending=$false} | Select-Object -first 1
+            $latestExtension = $armExtensions | sort @{Expression={$_.Version}; Ascending=$false} | Select-Object -first 1
 
             # Normalize the version number so that only major and minor components are present
             $latestVersion = $latestExtension.Version.Replace('.0.0', '')
 
-            # Compose extension properties
-            $properties = @{'publisher' = $_.Publisher ; 'type' = $_.ExtensionName; 'typeHandlerVersion' = $latestVersion; 'settings' = $(ConvertFrom-Json $_.PublicConfiguration)}
+            # Compose imperative script line for each extension
+            $imperativeSetExtension = "AzureResourceManager\Set-AzureVMExtension -ResourceGroupName {0} -VMName {1} -Name {2} -Publisher {3} -ExtensionType {4} -TypeHandlerVersion {5} -SettingString {6} -ProtectedSettingString {7} -Location {8}" `
+                -f $ResourceGroupName, $vm.Name, $latestExtension.Type, $latestExtension.PublisherName, $latestExtension.Type, $latestVersion, $extension.PublicConfiguration, $extension.PrivateConfiguration, $ServiceLocation
 
-            # Create an ARM resource representing the VM extension
-            $resources += New-ResourceTemplate -Type $resourceType -Name $("{0}/{1}" -f $VM.Name, $_.ExtensionName) -Location $ResourceLocation -ApiVersion $Global:apiVersion -Properties $properties -DependsOn @($vmDependency) 
+           $imperativeSetExtensions += $imperativeSetExtension
         }
     }
 
-    return $resources
+    return ($imperativeSetExtensions -join "`r`n" | Out-String)
 }
 
 function Get-AzureVmEndpoints
