@@ -1,6 +1,29 @@
 # asm2arm
 
-Testing Approach
+ASM2ARM
+=========
+Hello Azure expert! This is a PowerShell script module for migrating your Single VM from Azure Service Management stack to Azure Resource Manager stack.
+
+What does it do?
+-------------------
+ 1. Either copies the VMs disks over to an ARM storage account, or creates brand new ones (you are responsible to re-establish the state)
+ 2.  Creates a new virtual network, if the source VM is not in a VNET already, or uses the same name for the new VNET if it is in one. Same is for subnets
+ 3. It can either stop short of generating ARM templates and imperative script, or use those to deploy your new resources
+ 4. Creates an availability set if the VM is in one
+ 5. Creates a public IP if the VM is available on the internet
+ 6. Creates network security groups (NSG) for the source VMs public endpoints
+
+What does it not do?
+------------------------
+**Following are not in the scope of these scripts**
+ 1. Stops a running VM 
+ 2. Changes your data/disks
+ 3. Migrates running VMs
+ 4. Migrates multiple VMs in a complex scenario automagically
+ 5. Migrates the entire ASM network configuration
+ 6. Creates load balanced VMs. We assume this is a configuration the Azure expert needs to handle explicitly
+ 
+Tested Configurations
 --------
 
 The _Add-AzureSMVmToRM_ cmdlet was validated using the following test cases:
@@ -20,8 +43,3 @@ The _Add-AzureSMVmToRM_ cmdlet was validated using the following test cases:
 | 11 | Windows VM with custom extensions |
 | 12 | Windows VM in an availability set |
 | 13 | Windows VM in an availability set, with multiple data disks, public endpoints, in a vnet and subnet, and with custom extensions |
-
-Notes, Known Issues & Limitations
---------
-- Load balanced endpoints are not currently supported. These must be migrated manually for now.
-- To migrate multiple VMs, invoke the _Add-AzureSMVmToRM_ cmdlet iteratively from within a loop.
