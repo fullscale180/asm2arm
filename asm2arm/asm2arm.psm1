@@ -357,7 +357,7 @@ function Add-AzureSMVmToRM
     $setupTemplateFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-setup{1}.json' -f $OutputFileNameBase, $timestamp)
     $deployTemplateFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-deploy{1}.json' -f $OutputFileNameBase, $timestamp)
     $parametersFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-parameters{1}.json' -f $OutputFileNameBase, $timestamp)
-    $imperativeScriptFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-setextensions{1}.json' -f $OutputFileNameBase, $timestamp)
+    $imperativeScriptFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-setextensions{1}.ps1' -f $OutputFileNameBase, $timestamp)
 
     if (-not (Test-Path -Path $OutputFileFolder))
     {

@@ -71,6 +71,11 @@
 								'caching'= $vm.vm.OSVirtualHardDisk.HostCaching;
 								'createOption'= $osDiskCreateOption;} 
 
+    if ($DiskAction -eq "CopyDisks")
+    {
+        $osDisk.Add('osType', $VM.VM.OSVirtualHardDisk.OS); 
+    }
+    
 	# Add the osDisk section to the resource metadata
 	$storageProfile.Add('osDisk', $osDisk)                  
 
@@ -436,7 +441,7 @@ function New-VmExtensionResources
             $latestVersion = $latestExtension.Version.Replace('.0.0', '')
 
             # Compose imperative script line for each extension
-            $imperativeSetExtension = "AzureResourceManager\Set-AzureVMExtension -ResourceGroupName {0} -VMName {1} -Name {2} -Publisher {3} -ExtensionType {4} -TypeHandlerVersion {5} -SettingString {6} -ProtectedSettingString {7} -Location {8}" `
+            $imperativeSetExtension = "AzureResourceManager\Set-AzureVMExtension -ResourceGroupName {0} -VMName {1} -Name {2} -Publisher {3} -ExtensionType {4} -TypeHandlerVersion {5} -SettingString '{6}' -ProtectedSettingString '{7}' -Location {8}" `
                 -f $ResourceGroupName, $vm.Name, $latestExtension.Type, $latestExtension.PublisherName, $latestExtension.Type, $latestVersion, $extension.PublicConfiguration, $extension.PrivateConfiguration, $ServiceLocation
 
            $imperativeSetExtensions += $imperativeSetExtension
