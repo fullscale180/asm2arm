@@ -441,8 +441,14 @@ function New-VmExtensionResources
             $latestVersion = $latestExtension.Version.Replace('.0.0', '')
 
             # Compose imperative script line for each extension
-            $imperativeSetExtension = "AzureResourceManager\Set-AzureVMExtension -ResourceGroupName {0} -VMName {1} -Name {2} -Publisher {3} -ExtensionType {4} -TypeHandlerVersion {5} -SettingString '{6}' -ProtectedSettingString '{7}' -Location {8}" `
-                -f $ResourceGroupName, $vm.Name, $latestExtension.Type, $latestExtension.PublisherName, $latestExtension.Type, $latestVersion, $extension.PublicConfiguration, $extension.PrivateConfiguration, $ServiceLocation
+            $protectedSettingsString = ''
+            if ($extension.PrivateConfiguration)
+            {
+                $protectedSettingsString = "-ProtectedSettingString '{7}'" -f $extension.PrivateConfiguration
+            }
+
+            $imperativeSetExtension = "AzureResourceManager\Set-AzureVMExtension -ResourceGroupName '{0}' -VMName '{1}' -Name '{2}' -Publisher '{3}' -ExtensionType '{4}' -TypeHandlerVersion '{5}' -SettingString '{6}' {7} -Location '{8}'" `
+                -f $ResourceGroupName, $vm.Name, $latestExtension.Type, $latestExtension.PublisherName, $latestExtension.Type, $latestVersion, $extension.PublicConfiguration, $protectedSettingsString, $ServiceLocation
 
            $imperativeSetExtensions += $imperativeSetExtension
         }

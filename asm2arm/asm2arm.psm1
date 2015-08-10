@@ -417,6 +417,12 @@ function Add-AzureSMVmToRM
         Write-Verbose $("Creating a new deployment '{0}' in the resource group '{1}' using template {2}" -f $deploymentName, $ResourceGroupName, $deployTemplateFileName)
         $deploymentResult = AzureResourceManager\New-AzureResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Name $deploymentName -TemplateFile $deployTemplateFileName -TemplateParameterFile $parametersFileName -Location $location 
 
-        Invoke-Expression -Command $imperativeScript
+        if ($imperativeScript)
+        {        
+            # Wait for the deployment to stabilize to run the extensions
+            Start-Sleep -Seconds 120
+
+            Invoke-Expression -Command $imperativeScript
+        }
     }
 }
