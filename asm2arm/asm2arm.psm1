@@ -237,7 +237,7 @@ function Add-AzureSMVmToRM
 
     if ($currentVnet -eq $null)
     {
-        $virtualNetworkAddressSpaces = AzureResourceManager\Get-AzureVirtualNetwork | %{$_.AddressSpace.AddressPrefixes}
+        $virtualNetworkAddressSpaces = AzureResourceManager\Get-AzureVirtualNetwork | ForEach-Object {$_.AddressSpace.AddressPrefixes}
         $vnetAddressSpace = Get-AvailableAddressSpace $virtualNetworkAddressSpaces
         $subnetAddressSpace = Get-FirstSubnet -AddressSpace $vnetAddressSpace
 
