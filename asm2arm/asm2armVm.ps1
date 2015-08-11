@@ -476,126 +476,45 @@ function Get-AzureVmEndpoints
                                                          @{n='enableDirectServerReturn';e={$_.EnableDirectServerReturn}}
 }
 
-<#
-.Synopsis
-   Retrieve the ARM Image reference for a given ASM image
-.DESCRIPTION
-   Do a search on the ARM image catalog, based on the input ASM VM Image.
-.EXAMPLE
-   Get-AzureArmImageRef -Location $vm.$location -Image $vmImage
-#>
-function Get-AzureArmImageRef
+
+function Get-AzureDnsName
 {
-    [OutputType([PSCustomObject])]
+    [OutputType([string])]
     Param
     (
-        # Location to search the image reference in
-        [Parameter(Mandatory=$true)]
-        $Location,
-
-        # Param2 help description
-        [Microsoft.WindowsAzure.Commands.ServiceManagement.Model.OSImageContext]
-        $Image
+      $ServiceName,
+      $Location
     )
 
-    $asmToArmPublishersMap = @{
-        "Barracuda Networks, Inc." = "barracudanetworks";
-        "Bitnami" = "";
-        "Canonical" = "Canonical";
-        "Cloudera" = "cloudera";
-        "CoreOS" = "CoreOS";
-        "DataStax" = "datastax";
-        "GitHub, Inc." = "GitHub";
-        "Hortonworks" = "hortonworks";
-        "Microsoft Azure Site Recovery group" = "MicrosoftAzureSiteRecovery";
-        "Microsoft BizTalk Server Group" = "MicrosoftBizTalkServer";
-        "Microsoft Dynamics AX" = "MicrosoftDynamicsAX";
-        "Microsoft Dynamics GP Group" = "MicrosoftDynamicsGP";
-        "Microsoft Dynamics NAV Group" = "MicrosoftDynamicsNAV";
-        "Microsoft Hybrid Cloud Storage Group" = "MicrosoftHybridCloudStorage";
-        "Microsoft Open Technologies, Inc." = "msopentech";
-        "Microsoft SharePoint Group" = "MicrosoftSharePoint";
-        "Microsoft SQL Server Group" = "MicrosoftSQLServer";
-        "Microsoft Visual Studio Group" = "MicrosoftVisualStudio";
-        "Microsoft Windows Server Essentials Group" = "MicrosoftWindowsServerEssentials";
-        "Microsoft Windows Server Group" = "MicrosoftWindowsServer";
-        "Microsoft Windows Server HPC Pack team" = "MicrosoftWindowsServerHPCPack";
-        "Microsoft Windows Server Remote Desktop Group" = "MicrosoftWindowsServerRemoteDesktop";
-        "OpenLogic" = "OpenLogic";
-        "Oracle" = "Oracle";
-        "Puppet Labs" = "PuppetLabs";
-        "RightScale with Linux" = "RightScaleLinux";
-        "RightScale with Windows Server" = "RightScaleWindowsServer";
-        "Riverbed Technology" = "RiverbedTechnology";
-        "SUSE" = "SUSE"}
-
-    $publisher = $asmToArmPublishersMap[$Image.PublisherName]
-
-    $offers = AzureResourceManager\Get-AzureVMImageOffer -Location $Location -PublisherName $publisher 
-
-    $skus = @()
-    $offers | ForEach-Object { $skus += AzureResourceManager\Get-AzureVMImageSku -Location $Location -PublisherName $publisher -Offer $_.Offer}
-
-    $imageLabelTokens = $image.ImageFamily.Split()
-    $skuRanks = @()     
-    foreach ($sku in $skus)
+    $retry = $true
+    $dnsSuffix = '{0}.cloudapp.azure.com' -f $Location.Replace(' ','').ToLower()  
+    $maxServiceNameLength = 253 - $dnsSuffix.Length
+    $ServiceName = $ServiceName.Substring(0,[math]::Min($maxServiceNameLength, $ServiceName.Length))  
+    
+    $suffix = 0
+    do
     {
-        $skuRank = [PSCustomObject] @{
-            'Skus' = $sku.Skus;
-            'Offer' = $sku.Offer;
-            'Rank' = 0;
-            }
-        
-        foreach ($token in $imageLabelTokens)
+        $dnsName = '{0}.{1}' -f $ServiceName, $dnsSuffix
+
+        # No Test-AzureName for ARM... do .NET call instead.
+        try 
         {
-            if ($sku.Skus.Contains($token)) {
-                $skuRank.Rank++                
-            }    
-        }
-
-        if ($skuRank.Rank -gt 0) {
-            $skuRanks += $skuRank
-        }
-    }
-
-    $maximumRank = ($skuRanks | Measure-Object -Maximum Rank).Maximum
-    $skusWithMaximumRank = $skuRanks | Where-Object {$_.Rank -eq $maximumRank}
-
-    if (-not $skusWithMaximumRank)
-    {
-        return $null
-    }
-
-    $images = @()
-    $optionCount = 1
-    foreach ($imageSku in $skusWithMaximumRank)
-    {
-        $imagesForSku = AzureResourceManager\Get-AzureVMImage -Location $Location -PublisherName $publisher -Offer $imageSku.Offer -Skus $imageSku.Skus -ErrorAction SilentlyContinue
-        if ($imagesForSku.Length -gt 0) {  
-            $latestImage = ($imagesForSku | Sort-Object -Property Version -Descending)[0]
-
-            $images += [PsCustomObject] @{
-                'Publisher' = $latestImage.PublisherName
-                'Offer' = $latestImage.Offer;
-                'Skus' = $latestImage.Skus;
-                'Version' = $latestImage.Version
-                'Id' = $latestImage.Id;
-                'Option' = $optionCount++;
+            [System.Net.Dns]::GetHostAddresses($dnsName) |  Out-Null
+        } 
+        catch [System.Management.Automation.MethodInvocationException] 
+        {
+            if ($_.Exception.Message -like '*No such host is known*')
+            {
+                $retry = $false
             }
         }
-    }
 
-    if ($images.Length -gt 0)
-    {
-        Write-Host "Found the following potential images:"
-        $images | Select-Object Option, Publisher, Offer, Skus, Version | Format-Table -AutoSize -Force | Out-Host
-        $option = Read-Host -Prompt "Please type in the Option number and press Enter"
-
-        return $images[$option - 1]
+        if ($retry)
+        {
+            $ServiceName = '{0}{1:00}' -f $ServiceName.Substring(0,[math]::Min($maxServiceNameLength - 2, $ServiceName.Length-2)), $suffix
+        }
     }
+    while ($retry)    
 
-    if ($skusWithMaximumRank.length -eq 0)
-    {
-        return $null
-    }
+    return $ServiceName
 }

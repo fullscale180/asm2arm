@@ -263,11 +263,9 @@ function Add-AzureSMVmToRM
         {
     		$sites = Azure\Get-AzureVNetSite -VNetName $vnetName -ErrorAction SilentlyContinue
         }
-        catch
+        catch [System.ArgumentException]
         {
-            [System.ArgumentException] | Out-Null
             # Eat the exception
-            $_.Exception | Out-Null
         }
 
 		# Walk through all sites to retrieve and collect their subnets
@@ -317,7 +315,7 @@ function Add-AzureSMVmToRM
 
     # Public IP Address resource
     $ipAddressName = '{0}_armpublicip' -f $vmName
-    $armDnsName = '{0}arm' -f $ServiceName
+    $armDnsName = Get-AzureDnsName -ServiceName $ServiceName -Location $location
     $publicIPAddressResource = New-PublicIpAddressResource -Name $ipAddressName -Location $resourceLocation `
         -AllocationMethod 'Dynamic' -DnsName $armDnsName
     $resources += $publicIPAddressResource
