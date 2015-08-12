@@ -376,9 +376,12 @@ function Add-AzureSMVmToRM
     Write-Verbose $("Generating ARM template parameters file and writing output to {0}" -f $parametersFileName)
     $parametersFile | Out-File $parametersFileName -Force
 
-    # Dumping the imperative script content to a file
-    Write-Verbose $("Generating imperative script file and writing output to {0}" -f $imperativeScriptFileName)
-    $imperativeScript | Out-File $imperativeScriptFileName -Force
+    if ($imperativeScript -ne '')
+    {
+        # Dumping the imperative script content to a file
+        Write-Verbose $("Generating imperative script file and writing output to {0}" -f $imperativeScriptFileName)
+        $imperativeScript | Out-File $imperativeScriptFileName -Force
+    }
 
     if($Deploy.IsPresent)
     {

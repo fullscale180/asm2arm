@@ -454,7 +454,12 @@ function New-VmExtensionResources
         }
     }
 
-    return ($imperativeSetExtensions -join "`r`n" | Out-String)
+    if ($imperativeSetExtensions -ne '')
+    {
+        return ($imperativeSetExtensions -join "`r`n" | Out-String)
+    }
+    
+    return ''
 }
 
 function Get-AzureVmEndpoints
