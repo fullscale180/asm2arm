@@ -37,19 +37,23 @@ The _Add-AzureSMVmToRM_ cmdlet was validated using the following test cases:
 
 | Test Case ID | Description |
 |:---|:---|
-| 1	| Windows VM with an OS disk |
-| 2	| Linux VM with an OS disk |
-| 3	| Windows VM with an OS disk and multiple data disks	|
-| 4	| Linux VM with an OS disk and multiple data disks |
-| 5 | Windows VM with multiple public endpoints |
-| 6 | Linux VM with multiple public endpoints |
-| 7 | Windows VM with public endpoints and certs |
-| 8 | Linux VM with public endpoints and certs |
-| 9 | Windows VM in a Vnet and subnet |
-| 10 | Linux VM in a Vnet and subnet |
-| 11 | Windows VM with custom extensions |
-| 12 | Windows VM in an availability set |
-| 13 | Windows VM in an availability set, with multiple data disks, public endpoints, in a vnet and subnet, and with custom extensions |
+| 1	| Windows VM with an existing OS disk |
+| 2	| Linux VM with an existing OS disk |
+| 3	| Windows VM with existing OS and data disks |
+| 4	| Linux VM with existing OS and data disks |
+| 5	| Windows VM with a new OS disk matched from Image Gallery |
+| 6	| Linux VM with a new OS disk matched from Image Gallery |
+| 7	| Windows VM with a new OS disk and empty data disks |
+| 8	| Linux VM with a new OS disk and empty data disks |
+| 9 | Windows VM with public endpoints |
+| 10 | Linux VM with public endpoints |
+| 11 | Windows VM with a WinRM certificate |
+| 12 | Windows VM in a Vnet and subnet |
+| 13 | Linux VM in a Vnet and subnet |
+| 14 | Windows VM with custom extensions |
+| 15 | Windows VM in an availability set |
+| 16 | Windows VM in an availability set, with multiple data disks, public endpoints, in a vnet and subnet, and with custom extensions |
+| 17 | Linux VM in an availability set, with multiple data disks, public endpoints, in a vnet and subnet, and with custom extensions |
 
 
 

@@ -198,9 +198,8 @@ function Add-AzureSMVmToRM
         $credentials = Get-Credential
         $parametersObject.Add('adminUser', $(New-ArmTemplateParameter -Type "string" -Description "Administrator user name")) 
         $actualParameters.Add('adminUser', $credentials.UserName)
-        
 
-        $parametersObject.Add('adminPassword', $(New-ArmTemplateParameter -Type "string" -Description "Administrator user password")) 
+        $parametersObject.Add('adminPassword', $(New-ArmTemplateParameter -Type "securestring" -Description "Administrator user password")) 
         $actualParameters.Add('adminPassword', $credentials.GetNetworkCredential().Password);
     }
 
@@ -315,6 +314,9 @@ function Add-AzureSMVmToRM
 
     # Public IP Address resource
     $ipAddressName = '{0}_armpublicip' -f $vmName
+
+    Write-Verbose $("Adding a resource definition for '{0}' public IP address" -f $ipAddressName)
+
     $armDnsName = Get-AzureDnsName -ServiceName $ServiceName -Location $location
     $publicIPAddressResource = New-PublicIpAddressResource -Name $ipAddressName -Location $resourceLocation `
         -AllocationMethod 'Dynamic' -DnsName $armDnsName
@@ -325,6 +327,8 @@ function Add-AzureSMVmToRM
     $subnetRef = '[concat(resourceId(''Microsoft.Network/virtualNetworks'',''{0}''),''/subnets/{1}'')]' -f $vnetName, $Global:asm2armSubnet
     $ipAddressDependency = 'Microsoft.Network/publicIPAddresses/{0}' -f $ipAddressName
     $vnetDependency = 'Microsoft.Network/virtualNetworks/{0}' -f $vnetName
+
+    Write-Verbose $("Adding a resource definition for '{0}' network interface" -f $nicName)
     
     $dependencies = @($ipAddressDependency)
     $nicResource = New-NetworkInterfaceResource -Name $nicName -Location $resourceLocation -PublicIpAddressName $ipAddressName -SubnetReference $subnetRef -Dependecies $dependencies
