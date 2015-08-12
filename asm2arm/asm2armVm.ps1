@@ -274,12 +274,18 @@ function New-VmResource
 
               $winRm.Add('listeners', @($listener));
             }
-        
+
             $windowsConfiguration = @{
-                    'provisionVMAgent' = $vm.vm.ProvisionGuestAgent;
-                    'winRM' = $winRm;
-                    'enableAutomaticUpdates' = $true
-                }
+                'provisionVMAgent' = $vm.vm.ProvisionGuestAgent;
+                'enableAutomaticUpdates' = $true
+            }
+
+            # If WinRM configuration was fully resolved, it must be specified in the resource
+            if($winRm.Count -ne 0)
+            {
+                $windowsConfiguration.Add('winRM', $winRm)
+            }
+        
             $osProfile.Add('windowsConfiguration', $windowsConfiguration)
         }
         elseif ($VM.vm.OSVirtualHardDisk.OS -eq "Linux")
