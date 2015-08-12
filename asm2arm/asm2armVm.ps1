@@ -503,7 +503,9 @@ function Get-AzureDnsName
         } 
         catch [System.Management.Automation.MethodInvocationException] 
         {
-            if ($_.Exception.Message -like '*No such host is known*')
+            # 11001 is Host not found and 11004 no data
+            # https://msdn.microsoft.com/en-us/library/windows/desktop/ms740668(v=vs.85).aspx
+            if (($_.Exception.InnerException.ErrorCode -eq 11001) -or ($_.Exception.InnerException.ErrorCode -eq 11004))
             {
                 $retry = $false
             }
