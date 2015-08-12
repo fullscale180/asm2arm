@@ -27,6 +27,9 @@
 	{
 		# Find the VMs image on the catalog
         $ImageName = $vm.vm.OSVirtualHardDisk.SourceImageName
+
+        Write-Verbose $("Discovering the corresponding target VM image for '{0}' source VM image" -f $ImageName)
+
 		$vmImage = Azure\Get-AzureVMImage -ImageName $ImageName -ErrorAction SilentlyContinue
 
 		if (-not $vmImage)
@@ -254,7 +257,6 @@ function New-VmResource
         {
             # QUESTION TO CRP TEAM
             # How to add windowsCOnfiguration property when there is a default WinRM endpoint?
-            <#
             $winRMListeners = @()
             $winRm = @{}
 
@@ -266,8 +268,7 @@ function New-VmResource
               $listener = @{'protocol' = $winRmUrlScheme}
               if ($WinRmCertificateName)
               {
-                $certificateUri = New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName `
-                    -CertificateName $(New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName $WinRmCertificateName)
+                $certificateUri = New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName $(New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName $WinRmCertificateName)
                 $listener.Add('certificateUrl', $certificateUri)
               }
 
@@ -280,7 +281,6 @@ function New-VmResource
                     'enableAutomaticUpdates' = $true
                 }
             $osProfile.Add('windowsConfiguration', $windowsConfiguration)
-            #>
         }
         elseif ($VM.vm.OSVirtualHardDisk.OS -eq "Linux")
         {
