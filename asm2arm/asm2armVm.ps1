@@ -525,3 +525,127 @@ function Get-AzureDnsName
 
     return $ServiceName
 }
+
+<#
+.Synopsis
+   Retrieve the ARM Image reference for a given ASM image
+.DESCRIPTION
+   Do a search on the ARM image catalog, based on the input ASM VM Image.
+.EXAMPLE
+   Get-AzureArmImageRef -Location $vm.$location -Image $vmImage
+#>
+function Get-AzureArmImageRef
+{
+    [OutputType([PSCustomObject])]
+	Param
+	(
+		# Location to search the image reference in
+		[Parameter(Mandatory=$true)]
+		$Location,
+
+		# Param2 help description
+		[Microsoft.WindowsAzure.Commands.ServiceManagement.Model.OSImageContext]
+		$Image
+	)
+
+	$asmToArmPublishersMap = @{
+		"Barracuda Networks, Inc." = "barracudanetworks";
+		"Bitnami" = "";
+		"Canonical" = "Canonical";
+		"Cloudera" = "cloudera";
+		"CoreOS" = "CoreOS";
+		"DataStax" = "datastax";
+		"GitHub, Inc." = "GitHub";
+		"Hortonworks" = "hortonworks";
+		"Microsoft Azure Site Recovery group" = "MicrosoftAzureSiteRecovery";
+		"Microsoft BizTalk Server Group" = "MicrosoftBizTalkServer";
+		"Microsoft Dynamics AX" = "MicrosoftDynamicsAX";
+		"Microsoft Dynamics GP Group" = "MicrosoftDynamicsGP";
+		"Microsoft Dynamics NAV Group" = "MicrosoftDynamicsNAV";
+		"Microsoft Hybrid Cloud Storage Group" = "MicrosoftHybridCloudStorage";
+		"Microsoft Open Technologies, Inc." = "msopentech";
+		"Microsoft SharePoint Group" = "MicrosoftSharePoint";
+		"Microsoft SQL Server Group" = "MicrosoftSQLServer";
+		"Microsoft Visual Studio Group" = "MicrosoftVisualStudio";
+		"Microsoft Windows Server Essentials Group" = "MicrosoftWindowsServerEssentials";
+		"Microsoft Windows Server Group" = "MicrosoftWindowsServer";
+		"Microsoft Windows Server HPC Pack team" = "MicrosoftWindowsServerHPCPack";
+		"Microsoft Windows Server Remote Desktop Group" = "MicrosoftWindowsServerRemoteDesktop";
+		"OpenLogic" = "OpenLogic";
+		"Oracle" = "Oracle";
+		"Puppet Labs" = "PuppetLabs";
+		"RightScale with Linux" = "RightScaleLinux";
+		"RightScale with Windows Server" = "RightScaleWindowsServer";
+		"Riverbed Technology" = "RiverbedTechnology";
+		"SUSE" = "SUSE"}
+
+	$publisher = $asmToArmPublishersMap[$Image.PublisherName]
+
+	$offers = AzureResourceManager\Get-AzureVMImageOffer -Location $Location -PublisherName $publisher 
+
+	$skus = @()
+	$offers | ForEach-Object { $skus += AzureResourceManager\Get-AzureVMImageSku -Location $Location -PublisherName $publisher -Offer $_.Offer}
+
+	$imageLabelTokens = $image.ImageFamily.Split()
+	$skuRanks = @()     
+	foreach ($sku in $skus)
+	{
+		$skuRank = [PSCustomObject] @{
+			'Skus' = $sku.Skus;
+			'Offer' = $sku.Offer;
+			'Rank' = 0;
+			}
+		
+		foreach ($token in $imageLabelTokens)
+		{
+			if ($sku.Skus.Contains($token)) {
+				$skuRank.Rank++                
+			}    
+		}
+
+		if ($skuRank.Rank -gt 0) {
+			$skuRanks += $skuRank
+		}
+	}
+
+	$maximumRank = ($skuRanks | Measure-Object -Maximum Rank).Maximum
+	$skusWithMaximumRank = $skuRanks | Where-Object {$_.Rank -eq $maximumRank}
+
+	if (-not $skusWithMaximumRank)
+	{
+		return $null
+	}
+
+	$images = @()
+	$optionCount = 1
+	foreach ($imageSku in $skusWithMaximumRank)
+	{
+		$imagesForSku = AzureResourceManager\Get-AzureVMImage -Location $Location -PublisherName $publisher -Offer $imageSku.Offer -Skus $imageSku.Skus -ErrorAction SilentlyContinue
+		if ($imagesForSku.Length -gt 0) {  
+			$latestImage = ($imagesForSku | Sort-Object -Property Version -Descending)[0]
+
+			$images += [PsCustomObject] @{
+				'Publisher' = $latestImage.PublisherName
+				'Offer' = $latestImage.Offer;
+				'Skus' = $latestImage.Skus;
+				'Version' = $latestImage.Version
+				'Id' = $latestImage.Id;
+				'Option' = $optionCount++;
+			}
+		}
+	}
+
+	if ($images.Length -gt 0)
+	{
+		Write-Host "Found the following potential images:"
+		$images | Select-Object Option, Publisher, Offer, Skus, Version | Format-Table -AutoSize -Force | Out-Host
+		$option = Read-Host -Prompt "Please type in the Option number and press Enter"
+
+        return $images[$option - 1]
+	}
+
+	if ($skusWithMaximumRank.length -eq 0)
+	{
+		return $null
+	}
+}
