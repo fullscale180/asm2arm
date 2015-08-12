@@ -37,10 +37,10 @@ The _Add-AzureSMVmToRM_ cmdlet was validated using the following test cases:
 
 | Test Case ID | Description |
 |:---|:---|
-| 1	| Windows VM with an OS disk |
-| 2	| Linux VM with an OS disk |
-| 3	| Windows VM with an OS disk and multiple data disks	|
-| 4	| Linux VM with an OS disk and multiple data disks |
+| 1	| Windows VM with an existing OS disk |
+| 2	| Linux VM with an existing OS disk |
+| 3	| Windows VM with existing OS and data disks |
+| 4	| Linux VM with existing OS and data disks |
 | 5 | Windows VM with public endpoints |
 | 6 | Linux VM with public endpoints |
 | 7 | Windows VM with a WinRM certificate |
