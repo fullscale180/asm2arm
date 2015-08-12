@@ -41,16 +41,15 @@ The _Add-AzureSMVmToRM_ cmdlet was validated using the following test cases:
 | 2	| Linux VM with an OS disk |
 | 3	| Windows VM with an OS disk and multiple data disks	|
 | 4	| Linux VM with an OS disk and multiple data disks |
-| 5 | Windows VM with multiple public endpoints |
-| 6 | Linux VM with multiple public endpoints |
-| 7 | Windows VM with public endpoints and certs |
-| 8 | Linux VM with public endpoints |
-| 9 | Windows VM in a Vnet and subnet |
-| 10 | Linux VM in a Vnet and subnet |
-| 11 | Windows VM with custom extensions |
-| 12 | Windows VM in an availability set |
-| 13 | Windows VM in an availability set, with multiple data disks, public endpoints, in a vnet and subnet, and with custom extensions |
-| 14 | Linux VM in an availability set, with multiple data disks, public endpoints, in a vnet and subnet, and with custom extensions |
+| 5 | Windows VM with public endpoints |
+| 6 | Linux VM with public endpoints |
+| 7 | Windows VM with a WinRM certificate |
+| 8 | Windows VM in a Vnet and subnet |
+| 9 | Linux VM in a Vnet and subnet |
+| 10 | Windows VM with custom extensions |
+| 11 | Windows VM in an availability set |
+| 12 | Windows VM in an availability set, with multiple data disks, public endpoints, in a vnet and subnet, and with custom extensions |
+| 13 | Linux VM in an availability set, with multiple data disks, public endpoints, in a vnet and subnet, and with custom extensions |
 
 
 
