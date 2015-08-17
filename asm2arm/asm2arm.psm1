@@ -229,7 +229,7 @@ function Add-AzureSMVmToRM
         $vnetName = $Global:asm2armVnetName
     } 
     else {
-        $vnetName = $VM.VirtualNetworkName + $Global:armSuffix
+        $vnetName = $(Get-CanonicalString $VM.VirtualNetworkName) + $Global:armSuffix
         # Wrapping in try-catch as the commandlet does not implement -ErrorAction SilentlyContinue
         try
         {
@@ -481,5 +481,5 @@ function Get-CanonicalString
         $original
     )
 
-    return ($($original -replace [regex]'[aeiouAEIOU]','') -replace [regex]'[^a-zA-Z]','').ToLower()
+    return ($($original -replace [regex]'^[0-9]*','') -replace [regex]'[^a-zA-Z0-9]','').ToLower()
 }
