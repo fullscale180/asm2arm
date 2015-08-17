@@ -236,7 +236,7 @@ function Add-AzureSMVmToRM
         $vnetName = $Global:asm2armVnetName
     } 
     else {
-        $vnetName += $Global:armSuffix
+        $vnetName = $VM.VirtualNetworkName + $Global:armSuffix
         # Wrapping in try-catch as the commandlet does not implement -ErrorAction SilentlyContinue
         try
         {
@@ -251,7 +251,7 @@ function Add-AzureSMVmToRM
         if ($configuration.Count -gt 0)
         {
             $networkConfiguration = $configuration[0]
-            $subnetName = $networkConfiguration[0]
+            $subnetName = $networkConfiguration.SubnetNames[0]
             $classicSubnet = $virtualNetworkSite.Subnets | Where-Object {$_.Name -eq $subnetName}
         }
     }
@@ -297,22 +297,20 @@ function Add-AzureSMVmToRM
             {
                 foreach ($addressPrefix in $currentVnet.AddressSpace.AddressPrefixes)
                 {
-                    if (Test-SubnetInAddressSpace $classicSubnet.AddressPrefix, $addressPrefix)
+                    if (Test-SubnetInAddressSpace -SubnetPrefix $classicSubnet.AddressPrefix -AddressSpace $addressPrefix)
                     {
                         $vnetAddressSpaces += $addressPrefix
                     }
                 }
 
-                break
+                $vmSubnetName = $classicSubnet.Name 
             }
+            Write-Verbose $("Found a matching subnet, adding a resource definition for '{0}' subnet" -f $subnet.Name)
+            $subnets += New-VirtualNetworkSubnet -Name $subnet.Name -AddressPrefix $subnet.AddressPrefix
         }
 
-        if ($subnetExists)
-        {
-            Write-Verbose $("Found a matching subnet, adding a resource definition for '{0}' subnet" -f $subnet.Name)
-            $subnets += New-VirtualNetworkSubnet -Name $classicSubnet.Name -AddressPrefix $classicSubnet.AddressPrefix
-            $vmSubnetName = $classicSubnet.Name 
-        } else {
+        if (-not $subnetExists)
+        {       
             # We could not find a suitable subnet. This could be because a new VM that could be added after an initial
             # cloning process for another VM. Let's find a suitable address space and add a new subnet
             $existingSubnets = @()
