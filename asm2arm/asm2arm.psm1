@@ -106,13 +106,6 @@ function Add-AzureSMVmToRM
         [ValidateNotNullOrEmpty()]
         [string]
         $OutputFileFolder,
-        
-        # File name base for the generated template and parameter files
-        [Parameter(Mandatory=$true)]
-        [ValidateNotNull()]
-        [ValidateNotNullOrEmpty()]
-        [string]
-        $OutputFileNameBase,
 
         # Generate timestamp in the file name or not, default is to generate the timestamp
         [Parameter(Mandatory=$false)]        
@@ -404,10 +397,11 @@ function Add-AzureSMVmToRM
     }
 
     # Construct output file names
-    $setupTemplateFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-setup{1}.json' -f $OutputFileNameBase, $timestamp)
-    $deployTemplateFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-deploy{1}.json' -f $OutputFileNameBase, $timestamp)
-    $parametersFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-parameters{1}.json' -f $OutputFileNameBase, $timestamp)
-    $imperativeScriptFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-setextensions{1}.ps1' -f $OutputFileNameBase, $timestamp)
+    $fileNamePrefix ='{0}-{1}' -f $vm.ServiceName, $vm.Name
+    $setupTemplateFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-setup{1}.json' -f $fileNamePrefix, $timestamp)
+    $deployTemplateFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-deploy{1}.json' -f $fileNamePrefix, $timestamp)
+    $parametersFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-parameters{1}.json' -f $fileNamePrefix, $timestamp)
+    $imperativeScriptFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-setextensions{1}.ps1' -f $fileNamePrefix, $timestamp)
 
     if (-not (Test-Path -Path $OutputFileFolder))
     {
