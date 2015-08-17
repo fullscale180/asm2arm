@@ -230,8 +230,7 @@ function Get-FirstAvailableRange
         return @()
     }
 
-    # Magic number coming from Azure portal default 2 bit mask increments for new subnets
-    $blockSize = 1024
+    $blockSize = 512
     $rangesCount = [math]::Floor(($End - $Start) / $blockSize)
     $ranges = @()
     if ($rangesCount -gt 0) 

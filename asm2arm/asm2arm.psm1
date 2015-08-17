@@ -313,7 +313,7 @@ function Add-AzureSMVmToRM
             # We could not find a suitable subnet. This could be because a new VM that could be added after an initial
             # cloning process for another VM. Let's find a suitable address space and add a new subnet
             $existingSubnets = @()
-            $currentVnet.Subnets | ForEach-Object {$existingSubnets += $_.AddressPrefix; $subnets += New-VirtualNetworkSubnet -Name $_.Name -AddressPrefix $_.AddressPrefix}
+            $currentVnet.Subnets | ForEach-Object {$existingSubnets += $_.AddressPrefix}
 
             $subnetAddressSpace = Get-AvailableAddressSpace $existingSubnets
 
