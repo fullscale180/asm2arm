@@ -62,11 +62,6 @@
 		# Create a copy of the existing VM disk
 		# Copy-VmDisks -VM $VM -StorageAccountName $StorageAccountName -ResourceGroupName $ResourceGroupName
 	}
-	elseif ($DiskAction -eq "KeepDisks")
-	{
-		# Reuse the existing OS disk image
-		$osDiskUri = $VM.VM.OSVirtualHardDisk.MediaLink.AbsoluteUri
-	}
 
 	# Compose OS disk section
 	$osDisk = @{'name' = 'osdisk'; `
@@ -85,16 +80,8 @@
 	# Compose data disk section
 	foreach ($disk in $VM.VM.DataVirtualHardDisks)
 	{
-		# Modify data disk URI to point to a copy of the disk
-		if ($DiskAction -eq "KeepDisks")
-		{
-			$dataDiskUri = $disk.MediaLink.AbsoluteUri
-		}
-		else
-		{
-			# Construct a new URI for the OS disk, which will be placed in the new storage account
-			$dataDiskUri = Get-NewBlobLocation -SourceBlobUri $disk.MediaLink.AbsoluteUri -StorageAccountName $StorageAccountName -ContainerName $Global:vhdContainerName
-		}
+		# Construct a new URI for the OS disk, which will be placed in the new storage account
+		$dataDiskUri = Get-NewBlobLocation -SourceBlobUri $disk.MediaLink.AbsoluteUri -StorageAccountName $StorageAccountName -ContainerName $Global:vhdContainerName
 
         # Slightly different property sets are required depending on disk action. For instance, diskSizeGB must only be set for new disks.
         if ($DiskAction -eq "NewDisks")
@@ -324,14 +311,7 @@ function New-VmResource
                                         'inputEndpoints' = Get-AzureVmEndpoints -VM $VM })
     
     $computeResourceProvider = "Microsoft.Compute/virtualMachines"
-    $crpApiVersion = $Global:apiVersion
-    if ($DiskAction -eq 'KeepDisks')
-    {
-        # ARM Compute Resource Provider (CRP) can only be used with Storage Resource Provider (SRP).
-        # Since keep disks uses the classic SRP, we need to use classic CRP.
-        $computeResourceProvider = "Microsoft.ClassicCompute/virtualMachines"
-        $crpApiVersion = $Global:classicResourceApiVersion
-    }            
+    $crpApiVersion = $Global:apiVersion        
 
     $resource = New-ResourceTemplate -Type $computeResourceProvider -Name $VM.Name -Location $Location -ApiVersion $crpApiVersion -Properties $properties -DependsOn $Dependecies
 
@@ -533,14 +513,6 @@ function Get-AzureDnsName
     return $ServiceName
 }
 
-<#
-.Synopsis
-   Retrieve the ARM Image reference for a given ASM image
-.DESCRIPTION
-   Do a search on the ARM image catalog, based on the input ASM VM Image.
-.EXAMPLE
-   Get-AzureArmImageRef -Location $vm.$location -Image $vmImage
-#>
 function Get-AzureArmImageRef
 {
     [OutputType([PSCustomObject])]

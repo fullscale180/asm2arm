@@ -260,10 +260,14 @@ function Add-AzureSMVmToRM
     $subnets = @()
     $vnetAddressSpaces = @()
     
+    # Does the resource manager have a virtual network we can use? If we have null, no.
     if ($currentVnet -eq $null)
     {
+        # Does the source VM is on a virtual network? If the vnetname is the default virtual network name, that means no.
         if ($vnetName -eq $Global:asm2armVnetName)
         {
+            # If we are here, that means no virtual network on the source VM and no virtual network on the target resource group.
+            # Cust create a default virtual network with a default subnet.
             $vnetAddressSpaces += $Global:defaultAddressSpace
 
             Write-Verbose $("Adding a resource definition for '{0}' subnet - new default subnet" -f $Global:asm2armSubnet)
@@ -271,6 +275,7 @@ function Add-AzureSMVmToRM
             $subnets += New-VirtualNetworkSubnet -Name $Global:asm2armSubnet -AddressPrefix $Global:defaultSubnetAddressSpace
             $vmSubnetName = $Global:asm2armSubnet 
         } else {
+            # The source VM is on a virtual network. Copy all of the virtual network to ARM
             Write-Verbose $("Copying the classic virtual network specification")
             foreach ($addressSpace in $virtualNetworkSite.AddressSpacePrefixes)
             {
@@ -287,7 +292,8 @@ function Add-AzureSMVmToRM
     }
     else {
         # If we are here, that means we had previously made a cloning, or the virtual network we are trying to create exists.
-        # Let's see if we have the subnet created.
+        # We need to create the exact copy of the existing virtual network specification, and add a new subnet if the target
+        # subnet does not exist.
 
         $subnetExists = $false
         foreach ($subnet in $currentVnet.Subnets)

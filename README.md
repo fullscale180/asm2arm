@@ -107,3 +107,6 @@ The _Add-AzureSMVmToRM_ cmdlet was validated using the following test cases:
 | 15 | Windows VM in an availability set |
 | 16 | Windows VM in an availability set, with multiple data disks, public endpoints, in a vnet and subnet, and with custom extensions |
 | 17 | Linux VM in an availability set, with multiple data disks, public endpoints, in a vnet and subnet, and with custom extensions |
+
+## Notes
+1. If multiple VMs are cloned one after the other with short time intervals in between them, there might be DNS name conflicts for the public IP addresses, due to the DNS cache refresh time.

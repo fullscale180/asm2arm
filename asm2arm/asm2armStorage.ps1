@@ -14,21 +14,6 @@
     return $resource
 }
 
-function New-ClassicStorageAccountResource
-{
-    Param
-    (
-        $Name,
-        $Location
-    )
-
-    $createProperties = @{"accountType" = "Standard-LRS";}
-    $resource = New-ResourceTemplate -Type "Microsoft.ClassicStorage/storageAccounts" -Name $Name `
-        -Location $Location -ApiVersion $Global:classicResourceApiVersion -Properties $createProperties
-
-    return $resource
-}
-
 function Get-StorageAccountName
 {
     [OutputType([string])]
