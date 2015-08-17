@@ -263,11 +263,9 @@ function New-VmResource
             # Either of the two well-known endpoint names identify the presence of the WinRM endpoint on which we need to take further actions
             $winRmEndpoint = $endpoints | Where-Object {$_.Name -eq "PowerShell" -or $_.Name -eq "WinRM"}
 
-            if ($winRmEndpoint -ne $null)
-            {
-              $winRmUrlScheme = ($VM | Azure\Get-AzureWinRMUri).Scheme
-            
-              $listener = @{'protocol' = $winRmUrlScheme}
+            if ($winRmEndpoint -ne $null -and $false)
+            {            
+              $listener = @{'protocol' = "https"}
 
               if ($WinRmCertificateName)
               {

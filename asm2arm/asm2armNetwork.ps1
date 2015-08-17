@@ -105,8 +105,8 @@ function Get-AvailableAddressSpace
 
     if ($addressSpaces -eq $null -or $addressSpaces.Length -eq 0)
     {
-        # Return default, 0.0.0.1/20 network
-        return "10.0.0.0/20"
+        # Return default, 10.0.0.1/16 network
+        return "10.0.0.0/16"
     }
 
     $hostRanges = @()
@@ -179,8 +179,7 @@ function Get-HostRange
         throw "No network prefix is found"
     }
 
-    $dottedDecimals = $network.Split('.')
-    [uint32] $uintNetwork = [uint32]([uint32]$dottedDecimals[0] -shl 24) + [uint32]([uint32]$dottedDecimals[1] -shl 16) + [uint32]([uint32]$dottedDecimals[2] -shl 8) + [uint32]$dottedDecimals[3] 
+    [uint32] $uintNetwork = Get-IntIp $network
     
     $networkMask = (-bnot [uint32]0) -shl (32 - $cidrPrefix)
     $broadcast = $uintNetwork -bor ((-bnot $networkMask) -band [uint32]::MaxValue) 
@@ -203,6 +202,18 @@ function Get-DecimalIp
     return "{0}.{1}.{2}.{3}" -f [int]($uintIp -shr 24), [int](($uintIp -shr 16) -band 255), [int](($uintIp -shr 8) -band 255), [int]($uintIp -band 255)
 }
 
+function Get-IntIp
+{
+    [OutputType([uint32])]
+    Param(
+        [string]
+        $ipString
+    )
+
+    $dottedDecimals = $ipString.Split('.')
+    return [uint32]([uint32]$dottedDecimals[0] -shl 24) + [uint32]([uint32]$dottedDecimals[1] -shl 16) + [uint32]([uint32]$dottedDecimals[2] -shl 8) + [uint32]$dottedDecimals[3] 
+}
+
 function Get-FirstAvailableRange
 {
     [OutputType([PSCustomObject])]
@@ -219,7 +230,8 @@ function Get-FirstAvailableRange
         return @()
     }
 
-    $blockSize = 4096
+    # Magic number coming from Azure portal default 2 bit mask increments for new subnets
+    $blockSize = 1024
     $rangesCount = [math]::Floor(($End - $Start) / $blockSize)
     $ranges = @()
     if ($rangesCount -gt 0) 
@@ -277,24 +289,23 @@ function Get-PrefixForNetwork
     return (32 - $netPrefix)
 }
 
-function Get-FirstSubnet
+function Test-SubnetInAddressSpace
 {
-    [OutputType([string])]
+    [OutputType([boolean])]
     Param(
-        [string]
+        $SubnetPrefix,
         $AddressSpace
     )
 
-    $network, [int]$cidrPrefix = $AddressSpace.Split('/')
-    if ($cidrPrefix -eq 0)
-    {
-        throw "No network prefix is found"
-    }
+    $subnetIp, [int]$subnetBits = $SubnetPrefix.Split('/')
+    $AddressSpaceIp, [int]$addressSpaceBits = $AddressSpace.Split('/')
 
-    if ($cidrPrefix -gt 28)
-    {
-        return "{0}/{1}" -f $network, $cidrPrefix
-    }
+    $subnetMask = (-bnot [uint32]0) -shl (32 - $subnetBits)
+    $addressSpaceMask = (-bnot [uint32]0) -shl (32 - $addressSpaceBits)
+    
+    $intSubnet = Get-IntIp $subnetIp
+    $intAddressSpace = Get-IntIp $AddressSpaceIp
 
-    return  "{0}/{1}" -f $network, ($cidrPrefix + 2)
+    return (($intSubnet -band $addressSpaceMask) -eq $intAddressSpace)
 }
+

@@ -40,9 +40,20 @@ How to use it?
  6. The session you start (or initialize) with bootstrap loads in two of the Azure PowerShell modules, Azure and AzureResourceManager. The standard scoping rules for PowerShell apply here. If you want to access the ASM version of Get-AzureVm, you need to scope it like Azure\Get-AzureVm, if you want to access the ARM version, then, AzureResourceManager\Get-AzureVm
 
 ## How does it work?
+<<<<<<< HEAD
 Let's start with the simplest case:
 
 assume we have a VM, named *atestvm* deployed on a cloud service *acloudservice*.
+=======
+Let's start with an example, assume we have a VM, named *atestvm* deployed on a cloud service *acloudservice*.
+
+This VM has
+* Size Basic_A3
+* Multiple data disks
+* RDP port is open, public port is N, local port is 3389
+* Not on a Vnet
+* Not a member of availability set
+
 
 We can refer to that VM in two ways using the cmdlet, ( -AppendTimeStampForFiles and -Deploy are optional flags)
 * Using the Azure PowerShell VM object (PersistentVMRoleContext type as the result of *Get-AzureVm* cmdlet, and pass it as the value of the parameter VM, e.g.
@@ -52,6 +63,10 @@ $vm = Azure\Get-AzureVm -ServiceName acloudservice -Name atestvm
  Add-AzureSMVmToRM -VM $vm -ResourceGroupName aresourcegroupname -DiskAction CopyDisks -OutputFileFolder D:\myarmtemplates -OutputFileNameBase abasename -AppendTimeStampForFiles -Deploy
 ```
 * Using the service name and VM name parameters directly
+
+``` PowerShell
+	Add-AzureSMVmToRM -ServiceName acloudservice -Name atestvm -ResourceGroupName aresourcegroupname -DiskAction CopyDisks -OutputFileFolder D:\myarmtemplates -OutputFileNameBase abasename -AppendTimeStampForFiles -Deploy
+```
 
 Tested configurations
 --------

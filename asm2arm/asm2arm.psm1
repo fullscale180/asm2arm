@@ -178,7 +178,7 @@ function Add-AzureSMVmToRM
     $currentSubscription = AzureResourceManager\Get-AzureSubscription -Current
     
     # Generate a canonical subscription name to use as the stem for other names
-    $canonicalSubscriptionName = ($($currentSubscription.SubscriptionName -replace [regex]'[aeiouAEIOU]','') -replace [regex]'[^a-zA-Z]','').ToLower()
+    $canonicalSubscriptionName = Get-CanonicalString $currentSubscription.SubscriptionName 
 
     # Start building the ARM template
     
@@ -208,97 +208,139 @@ function Add-AzureSMVmToRM
 
     # This varibale gathers all resources that form a setup phase. These include storage accounts, virtual networks, availability sets.
     $setupResources = @()
+    
+    # Generate the storage account name for the ARM deployments. This function will test the existence of the account, and will generate a new name 
+    # if the storage account exists on a different location.
+    $storageAccountName = Get-StorageAccountName -NamePrefix $canonicalSubscriptionName  -Location $location
 
-    if ($DiskAction -eq 'NewDisks' -or $DiskAction -eq 'CopyDisks')
+    # Check if we need to create storage account resource. 
+    if (-not $(Azure\Test-AzureName -Storage $storageAccountName))
     {
-        # Storage account resource
-        $storageAccountName = Get-StorageAccountName -NamePrefix $canonicalSubscriptionName  -Location $location
-        if (-not $(Azure\Test-AzureName -Storage $storageAccountName))
-        {
-            Write-Verbose $("Adding a resource definition for '{0}' storage account" -f $storageAccountName)
+        Write-Verbose $("Adding a resource definition for '{0}' storage account" -f $storageAccountName)
 
-            $vmOsDiskStorageAccountName = ([System.Uri]$VM.VM.OSVirtualHardDisk.MediaLink).Host.Split('.')[0]
+        $vmOsDiskStorageAccountName = ([System.Uri]$VM.VM.OSVirtualHardDisk.MediaLink).Host.Split('.')[0]
 
-            $storageAccount = Azure\Get-AzureStorageAccount -StorageAccountName $vmOsDiskStorageAccountName
-            $storageAccountResource = New-StorageAccountResource -Name $storageAccountName -Location $resourceLocation -StorageAccountType $storageAccount.AccountType
-            $setupResources += $storageAccountResource
-        }
+        $storageAccount = Azure\Get-AzureStorageAccount -StorageAccountName $vmOsDiskStorageAccountName
+        $storageAccountResource = New-StorageAccountResource -Name $storageAccountName -Location $resourceLocation -StorageAccountType $storageAccount.AccountType
+        $setupResources += $storageAccountResource
     }
     
     # Virtual network resource
-    $vnetName = $Global:asm2armVnetName
-    if ($VM.VirtualNetworkName -ne "")
+    $virtualNetworkSite = $null
+    $vmSumbnet = ''
+    $networkConfiguration = $null
+    $classicSubnet = $null
+    $vmSubnetName = ""
+    if ($VM.VirtualNetworkName -eq $null)
     {
-        $vnetName += $Global:armSuffix
-    }
-    
-	$currentVnet = AzureResourceManager\Get-AzureVirtualNetwork -Name $vnetName -ResourceGroupName $ResourceGroupName -ErrorAction SilentlyContinue
-
-    if ($currentVnet -eq $null)
-    {
-        $virtualNetworkAddressSpaces = AzureResourceManager\Get-AzureVirtualNetwork | ForEach-Object {$_.AddressSpace.AddressPrefixes}
-        $vnetAddressSpace = Get-AvailableAddressSpace $virtualNetworkAddressSpaces
-        $subnetAddressSpace = Get-FirstSubnet -AddressSpace $vnetAddressSpace
-
-        Write-Verbose $("Adding a resource definition for '{0}' subnet" -f $Global:asm2armSubnet)
-
-        $subnet = New-VirtualNetworkSubnet -Name $Global:asm2armSubnet -AddressPrefix $subnetAddressSpace
-
-        Write-Verbose $("Adding a resource definition for '{0}' virtual network" -f $vnetName)
-
-        $vnetResource = New-VirtualNetworkResource -Name $vnetName -Location $resourceLocation -AddressSpacePrefixes @($vnetAddressSpace) -Subnets @($subnet)
-        $setupResources += $vnetResource
-    }
+        $vnetName = $Global:asm2armVnetName
+    } 
     else {
-        # This block of code takes care of checking the subnet, and adding it to the resource as necessary
-		$existingSubnets = @()
-		$newSubnets = @()
-
-		# Obtain the list of all sites associated with the vnet
-        $sites = $null
-
+        $vnetName = $VM.VirtualNetworkName + $Global:armSuffix
         # Wrapping in try-catch as the commandlet does not implement -ErrorAction SilentlyContinue
         try
         {
-    		$sites = Azure\Get-AzureVNetSite -VNetName $vnetName -ErrorAction SilentlyContinue
+    		$virtualNetworkSite = Azure\Get-AzureVNetSite -VNetName $vm.VirtualNetworkName -ErrorAction SilentlyContinue
         }
         catch [System.ArgumentException]
         {
-            # Eat the exception
+            throw $("Cannot find the virtual network {0} for VM {0}" -f $vm.VirtualNetworkName, $vm.Name)
         }
 
-		# Walk through all sites to retrieve and collect their subnets
-		$sites | ForEach-Object { $_.Subnets | ForEach-Object { $existingSubnets += $_ } }
-        
-        if ($sites -ne $null)
+        $configuration = $vm.VM.ConfigurationSets | Where-Object {$_.ConfigurationSetType -eq 'NetworkConfiguration'}
+        if ($configuration.Count -gt 0)
         {
-		    # Walk through all existing subnets and identify those that are as yet not in the resource group
-		    foreach ($subnet in $existingSubnets)
-		    {
-			    $subnetExists = $false
-			    $subnetExists = $currentVnet.Subnets | ForEach-Object { if($subnet.AddressPrefix -eq $_.AddressPrefix) { $subnetExists = $true } }
-
-			    # Those subnets that are not currently in the resource group must be included into the Vnet resource
-			    if ($subnetExists -eq $false)
-			    {
-				    # Find out what network security group the existing subnet belongs
-				    $subnetSecGroup = AzureResourceManager\Get-AzureNetworkSecurityGroupForSubnet -VirtualNetworkName $vnetName -SubnetName $subnet.Name
-
-				    # Create a new resource entity representing the existing subnet in ARM
-				    $subnetResource = New-VirtualNetworkSubnet -Name $subnet.Name -AddressPrefix $subnet.AddressPrefix
-				    $newSubnets += $subnetResource
-			    }
-		    }
-        
-    		# Create a net vnet resource with subnets from the existing vnet
-	    	$vnetResource = New-VirtualNetworkResource -Name $vnetName -Location $resourceLocation -AddressSpacePrefixes @($vnetAddressSpace) -Subnets $newSubnets
-            $setupResources += $vnetResource
-        }
-        else
-        {
-            # We have already migrated a VM, that was not in a VNet in ASM, and this is another one, simply put the VM in the same subnet.
+            $networkConfiguration = $configuration[0]
+            $subnetName = $networkConfiguration.SubnetNames[0]
+            $classicSubnet = $virtualNetworkSite.Subnets | Where-Object {$_.Name -eq $subnetName}
         }
     }
+    
+	$currentVnet = AzureResourceManager\Get-AzureVirtualNetwork -Name $vnetName -ResourceGroupName $ResourceGroupName -ErrorAction SilentlyContinue
+    $subnets = @()
+    $vnetAddressSpaces = @()
+    
+    if ($currentVnet -eq $null)
+    {
+        if ($vnetName -eq $Global:asm2armVnetName)
+        {
+            $vnetAddressSpaces += $Global:defaultAddressSpace
+
+            Write-Verbose $("Adding a resource definition for '{0}' subnet - new default subnet" -f $Global:asm2armSubnet)
+
+            $subnets += New-VirtualNetworkSubnet -Name $Global:asm2armSubnet -AddressPrefix $Global:defaultSubnetAddressSpace
+            $vmSubnetName = $Global:asm2armSubnet 
+        } else {
+            Write-Verbose $("Copying the classic virtual network specification")
+            foreach ($addressSpace in $virtualNetworkSite.AddressSpacePrefixes)
+            {
+                $vnetAddressSpaces += $addressSpace
+            }
+
+            foreach ($subnet in $virtualNetworkSite.Subnets)
+            {
+                Write-Verbose $("Adding a resource definition for '{0}' subnet" -f $subnet.Name)
+                $subnets += New-VirtualNetworkSubnet -Name $subnet.Name -AddressPrefix $subnet.AddressPrefix
+            }
+            $vmSubnetName = $classicSubnet.Name 
+        }
+    }
+    else {
+        # If we are here, that means we had previously made a cloning, or the virtual network we are trying to create exists.
+        # Let's see if we have the subnet created.
+
+        $subnetExists = $false
+        foreach ($subnet in $currentVnet.Subnets)
+        {
+            $subnetExists = $($subnet.AddressPrefix -eq $classicSubnet.AddressPrefix -and $subnet.Name -eq $classicSubnet.Name)
+            if ($subnetExists)
+            {
+                foreach ($addressPrefix in $currentVnet.AddressSpace.AddressPrefixes)
+                {
+                    if (Test-SubnetInAddressSpace -SubnetPrefix $classicSubnet.AddressPrefix -AddressSpace $addressPrefix)
+                    {
+                        $vnetAddressSpaces += $addressPrefix
+                    }
+                }
+
+                $vmSubnetName = $classicSubnet.Name 
+            }
+            Write-Verbose $("Found a matching subnet, adding a resource definition for '{0}' subnet" -f $subnet.Name)
+            $subnets += New-VirtualNetworkSubnet -Name $subnet.Name -AddressPrefix $subnet.AddressPrefix
+        }
+
+        if (-not $subnetExists)
+        {       
+            # We could not find a suitable subnet. This could be because a new VM that could be added after an initial
+            # cloning process for another VM. Let's find a suitable address space and add a new subnet
+            $existingSubnets = @()
+            $currentVnet.Subnets | ForEach-Object {$existingSubnets += $_.AddressPrefix; $subnets += New-VirtualNetworkSubnet -Name $_.Name -AddressPrefix $_.AddressPrefix}
+
+            $subnetAddressSpace = Get-AvailableAddressSpace $existingSubnets
+
+            foreach ($addressPrefix in $currentVnet.AddressSpace.AddressPrefixes)
+            {
+                if (Test-SubnetInAddressSpace -SubnetPrefix $subnetAddressSpace -AddressSpace $addressPrefix)
+                {
+                    $vnetAddressSpaces += $addressPrefix
+                }
+            }
+
+            $canonicalServiceName = Get-CanonicalString $vm.ServiceName
+            $canonicalVmName = Get-CanonicalString $vm.Name
+
+            $subnetName = 'subnet-{0}-{1}' -f $canonicalServiceName, $canonicalVmName
+
+            Write-Verbose $("Could not find a matching subnet within the existing virtual network, adding the subnet '{0}'" -f $subnetName)
+
+            $subnets += New-VirtualNetworkSubnet -Name $subnetName -AddressPrefix $subnetAddressSpace
+            $vmSubnetName = $subnetName
+        }
+    }
+
+    Write-Verbose $("Adding a resource definition for '{0}' virtual network" -f $vnetName)
+    $vnetResource = New-VirtualNetworkResource -Name $vnetName -Location $resourceLocation -AddressSpacePrefixes $vnetAddressSpaces -Subnets $subnets
+    $setupResources += $vnetResource
 
     # Availability set resource
     if ($VM.AvailabilitySetName)
@@ -324,7 +366,7 @@ function Add-AzureSMVmToRM
     
     # NIC resource
     $nicName = '{0}_nic' -f $vmName
-    $subnetRef = '[concat(resourceId(''Microsoft.Network/virtualNetworks'',''{0}''),''/subnets/{1}'')]' -f $vnetName, $Global:asm2armSubnet
+    $subnetRef = '[concat(resourceId(''Microsoft.Network/virtualNetworks'',''{0}''),''/subnets/{1}'')]' -f $vnetName, $vmSubnetName
     $ipAddressDependency = 'Microsoft.Network/publicIPAddresses/{0}' -f $ipAddressName
     $vnetDependency = 'Microsoft.Network/virtualNetworks/{0}' -f $vnetName
 
@@ -430,4 +472,14 @@ function Add-AzureSMVmToRM
             Invoke-Expression -Command $imperativeScript
         }
     }
+}
+
+function Get-CanonicalString
+{
+    Param(
+        [Parameter(Position=0)]
+        $original
+    )
+
+    return ($($original -replace [regex]'[aeiouAEIOU]','') -replace [regex]'[^a-zA-Z]','').ToLower()
 }
