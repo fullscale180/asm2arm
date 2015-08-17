@@ -230,7 +230,8 @@ function Add-AzureSMVmToRM
     $vmSumbnet = ''
     $networkConfiguration = $null
     $classicSubnet = $null
-    if ($VM.VirtualNetworkName -eq "")
+    $vmSubnetName = ""
+    if ($VM.VirtualNetworkName -eq $null)
     {
         $vnetName = $Global:asm2armVnetName
     } 
@@ -268,6 +269,7 @@ function Add-AzureSMVmToRM
             Write-Verbose $("Adding a resource definition for '{0}' subnet - new default subnet" -f $Global:asm2armSubnet)
 
             $subnets += New-VirtualNetworkSubnet -Name $Global:asm2armSubnet -AddressPrefix $Global:defaultSubnetAddressSpace
+            $vmSubnetName = $Global:asm2armSubnet 
         } else {
             Write-Verbose $("Copying the classic virtual network specification")
             foreach ($addressSpace in $virtualNetworkSite.AddressSpacePrefixes)
@@ -280,6 +282,7 @@ function Add-AzureSMVmToRM
                 Write-Verbose $("Adding a resource definition for '{0}' subnet" -f $subnet.Name)
                 $subnets += New-VirtualNetworkSubnet -Name $subnet.Name -AddressPrefix $subnet.AddressPrefix
             }
+            $vmSubnetName = $classicSubnet.Name 
         }
     }
     else {
@@ -308,12 +311,22 @@ function Add-AzureSMVmToRM
         {
             Write-Verbose $("Found a matching subnet, adding a resource definition for '{0}' subnet" -f $subnet.Name)
             $subnets += New-VirtualNetworkSubnet -Name $classicSubnet.Name -AddressPrefix $classicSubnet.AddressPrefix
+            $vmSubnetName = $classicSubnet.Name 
         } else {
             # We could not find a suitable subnet. This could be because a new VM that could be added after an initial
             # cloning process for another VM. Let's find a suitable address space and add a new subnet
-            $existingSubnets = $currentVnet.Subnets | Select-Object -Property AddressPrefix
+            $existingSubnets = @()
+            $currentVnet.Subnets | ForEach-Object {$existingSubnets += $_.AddressPrefix; $subnets += New-VirtualNetworkSubnet -Name $_.Name -AddressPrefix $_.AddressPrefix}
 
-            $vnetAddressSpace = Get-AvailableAddressSpace $existingSubnets
+            $subnetAddressSpace = Get-AvailableAddressSpace $existingSubnets
+
+            foreach ($addressPrefix in $currentVnet.AddressSpace.AddressPrefixes)
+            {
+                if (Test-SubnetInAddressSpace -SubnetPrefix $subnetAddressSpace -AddressSpace $addressPrefix)
+                {
+                    $vnetAddressSpaces += $addressPrefix
+                }
+            }
 
             $canonicalServiceName = Get-CanonicalString $vm.ServiceName
             $canonicalVmName = Get-CanonicalString $vm.Name
@@ -322,8 +335,8 @@ function Add-AzureSMVmToRM
 
             Write-Verbose $("Could not find a matching subnet within the existing virtual network, adding the subnet '{0}'" -f $subnetName)
 
-            $vnetAddressSpaces += $vnetAddressSpace
             $subnets += New-VirtualNetworkSubnet -Name $subnetName -AddressPrefix $subnetAddressSpace
+            $vmSubnetName = $subnetName
         }
     }
 
@@ -355,7 +368,7 @@ function Add-AzureSMVmToRM
     
     # NIC resource
     $nicName = '{0}_nic' -f $vmName
-    $subnetRef = '[concat(resourceId(''Microsoft.Network/virtualNetworks'',''{0}''),''/subnets/{1}'')]' -f $vnetName, $Global:asm2armSubnet
+    $subnetRef = '[concat(resourceId(''Microsoft.Network/virtualNetworks'',''{0}''),''/subnets/{1}'')]' -f $vnetName, $vmSubnetName
     $ipAddressDependency = 'Microsoft.Network/publicIPAddresses/{0}' -f $ipAddressName
     $vnetDependency = 'Microsoft.Network/virtualNetworks/{0}' -f $vnetName
 

@@ -306,6 +306,6 @@ function Test-SubnetInAddressSpace
     $intSubnet = Get-IntIp $subnetIp
     $intAddressSpace = Get-IntIp $AddressSpaceIp
 
-    return (($intSubnet -band $subnetMask) -eq ($intAddressSpace -band $addressSpaceMask))
+    return (($intSubnet -band $addressSpaceMask) -eq $intAddressSpace)
 }
 
