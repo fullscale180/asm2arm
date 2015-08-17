@@ -62,8 +62,28 @@ $vm = Azure\Get-AzureVm -ServiceName acloudservice -Name atestvm
 	Add-AzureSMVmToRM -ServiceName acloudservice -Name atestvm -ResourceGroupName aresourcegroupname -DiskAction CopyDisks -OutputFileFolder D:\myarmtemplates -OutputFileNameBase abasename -AppendTimeStampForFiles -Deploy
 ```
 
+The cmdlet honors the -verbose option. Set that option to see the detailed diagnosis information.
 
+The high-level operating principle of the cmdlet is to go through steps for cloning the VM, and generate resources as custom PowerShell hash tables for Storage, Network and Compute resource providers.
+Those hash tables representing the resources are appended to an array, later turned into a template by serialized to JSON, and written to a file.
 
+The template creates 3 or 4 files depending on the existence of VM agent extensions. Those are all placed in the directory specified by OutputFileFolder parameter. The files are:
+1. `<OutputFileNameBase>-setup.json`: This file represents the resources that are needed to be prepared before the VM is cloned, and potentially be the same for any subsequent VMs (we do not maintain state between subsequent runs, but since a storage account needs to be provisioned before a blob copy operation happens, which is done imperatively, it was only logical to group like resources into one)
+2. `<OutputFileNameBase>-deploy.json`: Contains the template for the VM
+3. `<OutputFileNameBase>-parameters.json`: Contains the actual parameters passed to the templates
+4. `<OutputFileNameBase>-setextensions.json`: a set of PowerShell commandlets to be run for setting the VM agent extensions.
+
+If the -Deploy flag is set, after generating the files, the cmdlet then deploys the <OutputFileNameBase>-setup.json template, copies the source VM disk blobs if the DiskAction parameter is set to CopyDisks and then deploys the <OutputFileNameBase>-deploy.json template, using the <OutputFileNameBase>-parameters.json file for parameters. Once the deployment of the VM is done, if there is an imperative script (for VM agent extensions), the script is executed.
+
+### Network details
+The cmdlet's intent is not to clone the ASM network settings to ARM. It utilizes the networking facilities in a way that is the most convenient for cloning the VM itself. Here is what happens on different conditions:
+1. No virtual network on the target resource group
+    1.1. Source VM is not on a subnet: A default virtual network with 10.0.0.0/16 is created along with a subnet, with 10.0.0.0/22 address space.
+    1.2. Source VM is on a subnet: The virtual network the VM is on is discovered, the specification of the virtual network, along with the subnets are copied over
+2. Target resource group has a virtual network with a name `<VM virtual network>arm` (the string 'arm' is appended)
+    2. 1. If the virtual network has a subnet with the same name and address space, use it
+    2.2. If no suitable subnet is found, find an address block out of the existing subnets with 22 bits mask and use that one.
+	
 Tested configurations
 --------
 The _Add-AzureSMVmToRM_ cmdlet was validated using the following test cases:
