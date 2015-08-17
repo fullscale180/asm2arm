@@ -263,7 +263,6 @@ function Add-AzureSMVmToRM
     {
         if ($vnetName -eq $Global:asm2armVnetName)
         {
-            # Following will return the default 10.0.0.0/16 since we are creating the virtual network
             $vnetAddressSpaces += $Global:defaultAddressSpace
 
             Write-Verbose $("Adding a resource definition for '{0}' subnet - new default subnet" -f $Global:asm2armSubnet)
