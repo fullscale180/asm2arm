@@ -328,7 +328,23 @@ function Add-AzureSMVmToRM
             $canonicalServiceName = Get-CanonicalString $vm.ServiceName
             $canonicalVmName = Get-CanonicalString $vm.Name
 
-            $subnetName = 'subnet-{0}-{1}' -f $canonicalServiceName, $canonicalVmName
+            $subnetName = 'subnet-{0}-{1}' -f $canonicalServiceName, $canonicalVmName            
+            $increment = 0
+            do {
+                $newName = $true
+                foreach($subnet in $currentVnet.Subnets)
+                {
+                    if ($newName)                    
+                    {
+                        $newName = $subnetName -ne $subnet.Name
+                    }
+                }
+                if (-not $newName)
+                {
+                    $subnetName = "{0}-{1:00}" -f $subnetName, $increment
+                    $increment += 1
+                }
+            } until ($newName)
 
             Write-Verbose $("Could not find a matching subnet within the existing virtual network, adding the subnet '{0}'" -f $subnetName)
 
@@ -441,6 +457,7 @@ function Add-AzureSMVmToRM
 
     if($Deploy.IsPresent)
     {
+        
         New-AzureSmToVmDeployment -ResourceGroupName $ResourceGroupName -Location $location -ServiceName $vm.ServiceName -Name $vm.Name `
             -SetupTemplateFileName $setupTemplateFileName -ParametersFileName $parametersFileName -DeployTemplateFileName $deployTemplateFileName `
             -CopyDisksScript $copyDisksScriptFileName -ImperativeScript $imperativeScript
@@ -552,6 +569,8 @@ function New-AzureSmToVmDeployment
 
         if ($CopyDisksScript -ne "" -and $(Test-Path -Path $CopyDisksScript))
         {
+            Start-HyperboliclWaitForStorageAccount -startSeconds 120 -resourceGroupName $ResourceGroupName -StorageAccountName $storageAccountName
+
             Write-Verbose $("CopyDisks option was requested - all existing VHDs will now be copied to '{0}' storage account managed by ARM" -f $storageAccountName)
             Invoke-Expression -Command $copyDisksScript
         }
@@ -577,4 +596,36 @@ function Get-CanonicalString
     )
 
     return ($($original -replace [regex]'^[0-9]*','') -replace [regex]'[^a-zA-Z0-9]','').ToLower()
+}
+
+function Start-HyperboliclWaitForStorageAccount
+{
+    Param(
+        $startSeconds,
+        $resourceGroupName,
+        $StorageAccountName)
+
+    $done = $false
+    $waitFor = $startSeconds
+    $iteration = 1
+    do {        
+        $storageAccount = AzureResourceManager\Get-AzureStorageAccount -ResourceGroupName $resourceGroupName -Name $StorageAccountName -ErrorAction SilentlyContinue
+        $done = $storageAccount -ne $null
+        if (-not $done)
+        {
+            Write-Verbose ("Waiting for {0} seconds for the storage account {1} to be created. This is try unmber {2}" -f $waitFor, $storageAccount, $iteration)
+            Start-Sleep -Seconds $waitFor
+            $waitFor = $startSeconds / $iteration
+            if ($iteration -le 10)
+            {
+                $iteration += 1
+            }
+        }
+        
+    } while ($iteration -le 100 -and -not $done)
+
+    if (-not $done)
+    {
+        throw "Storage account {0} on resource group {1} was not available in the allocated time" -f $StorageAccountName, $resourceGroupName
+    }
 }

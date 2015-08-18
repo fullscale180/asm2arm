@@ -132,29 +132,31 @@ function New-CopyVmDisksScript
 		
 		# Prepare a context in case the source storage account is still the same
 		#$vmOsDiskStorageAccountKey = (Azure\Get-AzureStorageKey -StorageAccountName $vmOsDiskStorageAccountName).Primary
-        $imperativeScript += '$vmOsDiskStorageAccountKey = (Azure\Get-AzureStorageKey -StorageAccountName ''{0}'').Primary' -f $vmOsDiskStorageAccountName
-		$imperativeScript += '$vmOsDiskStorageContext = Azure\New-AzureStorageContext -StorageAccountName ''{0}'' -StorageAccountKey $vmOsDiskStorageAccountKey' -f $vmOsDiskStorageAccountName
+        $imperativeScript += "`$vmOsDiskStorageAccountName = '{0}'" -f $vmOsDiskStorageAccountName
+        $imperativeScript += "`$vmOsDiskStorageAccountKey = (Azure\Get-AzureStorageKey -StorageAccountName `$vmOsDiskStorageAccountName).Primary"
+		$imperativeScript += "`$vmOsDiskStorageContext = Azure\New-AzureStorageContext -StorageAccountName `$vmOsDiskStorageAccountName -StorageAccountKey `$vmOsDiskStorageAccountKey"
 
 		# We are assuming we will be using the same storage account for all of the destination VM's disks.
 		# However, please make sure to take the storage account's available throughput constraints into account.
 		# Please see https://azure.microsoft.com/en-us/documentation/articles/storage-scalability-targets/ for details
-        $imperativeScript += ("`$armStorageAccount = AzureResourceManager\Get-AzureStorageAccount | Where-Object {`$_.Name -eq '" + $StorageAccountName + "'}" )
+        $imperativeScript += "`$StorageAccountName = '{0}'" -f $StorageAccountName
+        $imperativeScript += "`$armStorageAccount = AzureResourceManager\Get-AzureStorageAccount | Where-Object {`$_.Name -eq `$StorageAccountName}"
 
-        $armStorageAccount = AzureResourceManager\Get-AzureStorageAccount | Where-Object {$_.Name -eq $StorageAccountName }
-
-		$imperativeScript += '$destinationAccountKey = (AzureResourceManager\Get-AzureStorageAccountKey -Name ''{0}'' -ResourceGroupName $armStorageAccount.ResourceGroupName).Key1' -f $StorageAccountName
-		$imperativeScript += '$destinationContext = AzureResourceManager\New-AzureStorageContext -StorageAccountName ''{0}''  -StorageAccountKey $destinationAccountKey'-f $StorageAccountName
+		$imperativeScript += "`$destinationAccountKey = (AzureResourceManager\Get-AzureStorageAccountKey -Name `$StorageAccountName -ResourceGroupName `$armStorageAccount.ResourceGroupName).Key1"
+		$imperativeScript += "`$destinationContext = AzureResourceManager\New-AzureStorageContext -StorageAccountName `$StorageAccountName  -StorageAccountKey `$destinationAccountKey"
 		
 		$previousStorageAccountName = ''
 		$destContainerName = $Global:vhdContainerName
 
         # Create the destination container (if doesn't already exist)
-        $imperativeScript += 'Azure\New-AzureStorageContainer -Context $destinationContext -Name ''{0}'' -Permission Off -ErrorAction SilentlyContinue' -f $destContainerName
+        $imperativeScript += "Azure\New-AzureStorageContainer -Context `$destinationContext -Name '{0}' -Permission Off -ErrorAction SilentlyContinue" -f $destContainerName
 
 		foreach ($srcVhdUrl in $diskUrlsToCopy)
 		{
 			$root, $rawContainerName, $srcBlobNameParts = ([System.Uri]$srcVhdUrl).Segments
-			$srcAccountName = ([System.Uri]$srcVhdUrl).Host.Split('.')[0] 
+            
+            # Disks could be living on different storage accounts
+            $srcAccountName = ([System.Uri]$srcVhdUrl).Host.Split('.')[0] 
             $srcContainerName = $rawContainerName.Replace("/", "")
             $destBlobName = $srcBlobNameParts -join ""
 
@@ -164,26 +166,26 @@ function New-CopyVmDisksScript
             # Set up the source storage account context in two cases: during the very first iteration and when storage account name changes between URLs
 			if ($previousStorageAccountName -eq '' -or $previousStorageAccountName -ne $srcAccountName)
 			{                
-				$imperativeScript += '$sourceAccountKey = (Azure\Get-AzureStorageKey -StorageAccountName ''{0}'').Primary' -f $srcAccountName
-                $imperativeScript += '$sourceContext = Azure\New-AzureStorageContext -StorageAccountName ''{0}'' -StorageAccountKey $sourceAccountKey' -f $srcAccountName
+                $imperativeScript += "`$srcAccountName = '{0}'" -f $srcAccountName
+				$imperativeScript += "`$sourceAccountKey = (Azure\Get-AzureStorageKey -StorageAccountName `$srcAccountName).Primary"
+                $imperativeScript += "`$sourceContext = Azure\New-AzureStorageContext -StorageAccountName `$srcAccountName -StorageAccountKey `$sourceAccountKey"
 			}  
 
             # Acquire a reference to the blob containing the source VHD
-            $imperativeScript += '$srcCloudBlob = Azure\Get-AzureStorageBlob -Context $sourceContext -Container ''{0}'' -Blob ''{1}''' -f $srcContainerName, $destBlobName
+            $imperativeScript += "`$srcCloudBlob = Azure\Get-AzureStorageBlob -Context `$sourceContext -Container '{0}' -Blob '{1}'" -f $srcContainerName, $destBlobName
 
             $imperativeScript += 'Write-Output "Copying a VHD from {0} to {1}"' -f $srcVhdUrl, $destVhdUrl
 
-            $imperativeScript += '$blobCopy = AzureResourceManager\Start-AzureStorageBlobCopy -Context $sourceContext -ICloudBlob $srcCloudBlob.ICloudBlob -DestContext $destinationContext -DestContainer ''{0}'' -DestBlob ''{1}'' -Force' -f $destContainerName, $destBlobName
+            $imperativeScript += "`$blobCopy = AzureResourceManager\Start-AzureStorageBlobCopy -Context `$sourceContext -ICloudBlob `$srcCloudBlob.ICloudBlob -DestContext `$destinationContext -DestContainer '{0}' -DestBlob '{1}' -Force" -f $destContainerName, $destBlobName
             
             # Find out what's going on with our copy request and block
-            $imperativeScript += '$copyState = $blobCopy | Get-AzureStorageBlobCopyState -WaitForComplete'
+            $imperativeScript += "`$copyState = `$blobCopy | Get-AzureStorageBlobCopyState -WaitForComplete"
 
             # Dump the current state so that we can see it
             if($verboseOutput) { 
-                $imperativeScript += 'Write-Host `$copyState'
+                $imperativeScript += "Write-Host `$copyState"
             }		
-
-			$previousStorageAccountName = $srcAccountName
+            $previousStorageAccountName = $srcAccountName
 		}
 
     if ($imperativeScript.Count -gt 0)
