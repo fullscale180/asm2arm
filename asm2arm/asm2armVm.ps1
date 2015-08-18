@@ -109,7 +109,7 @@
 	return $storageProfile
 }
 
-function Copy-VmDisks
+function New-CopyVmDisksScript
 {
     [OutputType([string])]
 	Param (
