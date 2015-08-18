@@ -408,6 +408,7 @@ function Add-AzureSMVmToRM
     $deployTemplateFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-deploy{1}.json' -f $OutputFileNameBase, $timestamp)
     $parametersFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-parameters{1}.json' -f $OutputFileNameBase, $timestamp)
     $imperativeScriptFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-setextensions{1}.ps1' -f $OutputFileNameBase, $timestamp)
+    $copyDisksScriptFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-copydisks{1}.ps1' -f $OutputFileNameBase, $timestamp)
 
     if (-not (Test-Path -Path $OutputFileFolder))
     {
@@ -433,6 +434,12 @@ function Add-AzureSMVmToRM
         # Dumping the imperative script content to a file
         Write-Verbose $("Generating imperative script file and writing output to {0}" -f $imperativeScriptFileName)
         $imperativeScript | Out-File $imperativeScriptFileName -Force
+    }
+
+    if ($DiskAction -eq 'CopyDisks')
+    {
+        $copyDisksScript = New-CopyVmDisksScript -VM $VM -StorageAccountName $storageAccountName -ResourceGroupName $ResourceGroupName
+        $copyDisksScript | Out-File $copyDisksScriptFileName -Force
     }
 
     if($Deploy.IsPresent)
@@ -463,7 +470,7 @@ function Add-AzureSMVmToRM
         if ($DiskAction -eq 'CopyDisks')
         {
             Write-Verbose $("CopyDisks option was requested - all existing VHDs will now be copied to '{0}' storage account managed by ARM" -f $storageAccountName)
-            Copy-VmDisks -VM $VM -StorageAccountName $storageAccountName -ResourceGroupName $ResourceGroupName
+            Invoke-Expression -Command $copyDisksScript
         }
 
         # Enter tha main deployment phase
