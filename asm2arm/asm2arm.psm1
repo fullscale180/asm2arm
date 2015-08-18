@@ -106,13 +106,6 @@ function Add-AzureSMVmToRM
         [ValidateNotNullOrEmpty()]
         [string]
         $OutputFileFolder,
-        
-        # File name base for the generated template and parameter files
-        [Parameter(Mandatory=$true)]
-        [ValidateNotNull()]
-        [ValidateNotNullOrEmpty()]
-        [string]
-        $OutputFileNameBase,
 
         # Generate timestamp in the file name or not, default is to generate the timestamp
         [Parameter(Mandatory=$false)]        
@@ -236,7 +229,7 @@ function Add-AzureSMVmToRM
         $vnetName = $Global:asm2armVnetName
     } 
     else {
-        $vnetName = $VM.VirtualNetworkName + $Global:armSuffix
+        $vnetName = $(Get-CanonicalString $VM.VirtualNetworkName) + $Global:armSuffix
         # Wrapping in try-catch as the commandlet does not implement -ErrorAction SilentlyContinue
         try
         {
@@ -320,7 +313,7 @@ function Add-AzureSMVmToRM
             # We could not find a suitable subnet. This could be because a new VM that could be added after an initial
             # cloning process for another VM. Let's find a suitable address space and add a new subnet
             $existingSubnets = @()
-            $currentVnet.Subnets | ForEach-Object {$existingSubnets += $_.AddressPrefix; $subnets += New-VirtualNetworkSubnet -Name $_.Name -AddressPrefix $_.AddressPrefix}
+            $currentVnet.Subnets | ForEach-Object {$existingSubnets += $_.AddressPrefix}
 
             $subnetAddressSpace = Get-AvailableAddressSpace $existingSubnets
 
@@ -404,10 +397,11 @@ function Add-AzureSMVmToRM
     }
 
     # Construct output file names
-    $setupTemplateFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-setup{1}.json' -f $OutputFileNameBase, $timestamp)
-    $deployTemplateFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-deploy{1}.json' -f $OutputFileNameBase, $timestamp)
-    $parametersFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-parameters{1}.json' -f $OutputFileNameBase, $timestamp)
-    $imperativeScriptFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-setextensions{1}.ps1' -f $OutputFileNameBase, $timestamp)
+    $fileNamePrefix ='{0}-{1}' -f $vm.ServiceName, $vm.Name
+    $setupTemplateFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-setup{1}.json' -f $fileNamePrefix, $timestamp)
+    $deployTemplateFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-deploy{1}.json' -f $fileNamePrefix, $timestamp)
+    $parametersFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-parameters{1}.json' -f $fileNamePrefix, $timestamp)
+    $imperativeScriptFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-setextensions{1}.ps1' -f $fileNamePrefix, $timestamp)
 
     if (-not (Test-Path -Path $OutputFileFolder))
     {
@@ -487,5 +481,5 @@ function Get-CanonicalString
         $original
     )
 
-    return ($($original -replace [regex]'[aeiouAEIOU]','') -replace [regex]'[^a-zA-Z]','').ToLower()
+    return ($($original -replace [regex]'^[0-9]*','') -replace [regex]'[^a-zA-Z0-9]','').ToLower()
 }
