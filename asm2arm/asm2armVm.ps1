@@ -141,12 +141,6 @@ function New-CopyVmDisksScript
         $imperativeScript += ("`$armStorageAccount = AzureResourceManager\Get-AzureStorageAccount | Where-Object {`$_.Name -eq '" + $StorageAccountName + "'}" )
 
         $armStorageAccount = AzureResourceManager\Get-AzureStorageAccount | Where-Object {$_.Name -eq $StorageAccountName }
-        # Check if we can actually find the storage account. If we are here, it should be either crated in this run, or earlier.
-        if (-not $armStorageAccount)
-        {
-            $message = "Cannot find a storage account with name {0} on the subscription's ARM stack." -f $StorageAccountName
-            throw $message
-        }
 
 		$imperativeScript += '$destinationAccountKey = (AzureResourceManager\Get-AzureStorageAccountKey -Name ''{0}'' -ResourceGroupName $armStorageAccount.ResourceGroupName).Key1' -f $StorageAccountName
 		$imperativeScript += '$destinationContext = AzureResourceManager\New-AzureStorageContext -StorageAccountName ''{0}''  -StorageAccountKey $destinationAccountKey'-f $StorageAccountName

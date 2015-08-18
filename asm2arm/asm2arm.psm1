@@ -1,7 +1,7 @@
 <#
 .Synopsis
-   Discover a single VM deployment on the Azure Service Management (ASM) deployments and
-   deploy a VM with the same image to an Azure Resource Manager (ARM) deployment.
+   Discover a single VM deployment on the Azure Service Management (ASM) deployments and generate templates and scripts
+   then optionally deploy a VM with the same image to an Azure Resource Manager (ARM) deployment.
 .DESCRIPTION
    Starts with the VM the user provided, discovers the VMs image, then queries the ARM
    VM image catalog, then creates an ARM template to be deployed to the ARM stack.
@@ -401,8 +401,8 @@ function Add-AzureSMVmToRM
     $setupTemplateFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-setup{1}.json' -f $fileNamePrefix, $timestamp)
     $deployTemplateFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-deploy{1}.json' -f $fileNamePrefix, $timestamp)
     $parametersFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-parameters{1}.json' -f $fileNamePrefix, $timestamp)
-    $imperativeScriptFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-setextensions{1}.ps1' -f $fileNamePrefix, $timestamp)
-    $copyDisksScriptFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-copydisks{1}.ps1' -f $fileNamePrefix, $timestamp)
+    $imperativeScriptFileName = ""
+    $copyDisksScriptFileName = ""
 
     if (-not (Test-Path -Path $OutputFileFolder))
     {
@@ -426,12 +426,14 @@ function Add-AzureSMVmToRM
     if ($imperativeScript -ne '')
     {
         # Dumping the imperative script content to a file
+        $imperativeScriptFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-setextensions{1}.ps1' -f $fileNamePrefix, $timestamp)
         Write-Verbose $("Generating imperative script file and writing output to {0}" -f $imperativeScriptFileName)
         $imperativeScript | Out-File $imperativeScriptFileName -Force
     }
 
     if ($DiskAction -eq 'CopyDisks')
     {
+        $copyDisksScriptFileName = Join-Path -Path $OutputFileFolder -ChildPath $('{0}-copydisks{1}.ps1' -f $fileNamePrefix, $timestamp)
         $copyDisksScript = New-CopyVmDisksScript -VM $VM -StorageAccountName $storageAccountName -ResourceGroupName $ResourceGroupName
         Write-Verbose $("Generating the script for copying the disk blobs and writing output to {0}" -f $copyDisksScriptFileName)
         $copyDisksScript | Out-File $copyDisksScriptFileName -Force
@@ -439,6 +441,92 @@ function Add-AzureSMVmToRM
 
     if($Deploy.IsPresent)
     {
+        New-AzureSmToVmDeployment -ResourceGroupName $ResourceGroupName -Location $location -ServiceName $vm.ServiceName -Name $vm.Name `
+            -SetupTemplateFileName $setupTemplateFileName -ParametersFileName $parametersFileName -DeployTemplateFileName $deployTemplateFileName `
+            -CopyDisksScript $copyDisksScriptFileName -ImperativeScript $imperativeScript
+    } else {
+            $deployCommandletCall = 'New-AzureSmToVmDeployment -ResourceGroupName ''{0}'' -Location ''{1}'' -ServiceName ''{2}'' -Name ''{3}''' `
+                            -f $ResourceGroupName, $location, $vm.ServiceName, $vm.Name
+            $deployCommandletCall += '-SetupTemplateFileName ''{0}'' -ParametersFileName ''{1}'' -DeployTemplateFileName ''{2}'' ' `
+                                    -f $setupTemplateFileName, $parametersFileName, $deployTemplateFileName
+            if ($copyDisksScriptFileName -ne "")
+            {
+                $deployCommandletCall += '-CopyDisksScript ''{0}''' -f $copyDisksScriptFileName
+            }
+
+            if ($imperativeScript -ne "")
+            {
+                $deployCommandletCall += '-ImperativeScript ''{0}''' -f $imperativeScript
+            }
+
+            Write-Host "Run the following line to deploy the generated templates and scripts `r`n"
+            Write-Host $deployCommandletCall.Trim()
+    }
+}
+
+<#
+.Synopsis
+   Clone (optionally) and deploy the VM using the generated scripts. THis is a part of asm2arm module, cannot be used by itself.
+.DESCRIPTION
+   Add-AzureSMVmToRM generates the scripts and templates and this commandlet deploys the templates and runs the scripts for the deployment.
+.EXAMPLE
+   
+.EXAMPLE
+   
+
+#>
+function New-AzureSmToVmDeployment 
+{
+    [CmdletBinding(PositionalBinding=$false,
+                  ConfirmImpact='Medium')]
+    Param(
+        # Resource group name for making the deployment
+        [Parameter(Mandatory=$true)]
+        [string]
+        $ResourceGroupName,
+        
+        # Location where the resource group will sit
+        [Parameter(Mandatory=$true)]
+        [string]
+        $Location,
+
+        # Source VM's service name
+        [Parameter(Mandatory=$true)]
+        [string]
+        $ServiceName,
+
+        # Name of the source VM
+        [Parameter(Mandatory=$true)]
+        [string]
+        $Name,
+
+        # Full path for the setup template file
+        [Parameter(Mandatory=$true)]
+        [string]
+        $SetupTemplateFileName,
+
+        # Full path for the parameter file
+        [Parameter(Mandatory=$true)]
+        [string]
+        $ParametersFileName,
+
+        # Full path for the VM deployment template
+        [Parameter(Mandatory=$true)]
+        [string]
+        $DeployTemplateFileName,
+
+        # Full path for the script to copy disk blobs
+        [Parameter(Mandatory=$false)]
+        [string]
+        $CopyDisksScript,
+
+        # Full path for the script to set the agent extensions
+        [Parameter(Mandatory=$false)]
+        [string]
+        $ImperativeScript
+
+    )
+
         $resourceGroup = AzureResourceManager\Get-AzureResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
 
         if ($resourceGroup -eq $null)
@@ -459,10 +547,10 @@ function Add-AzureSMVmToRM
         $deploymentName = "{0}_{1}" -f $ServiceName, $Name
 
         # Enter the setup phase
-        Write-Verbose $("Setting up a new deployment '{0}' in the resource group '{1}' using template {2}" -f $deploymentName, $ResourceGroupName, $setupTemplateFileName)
-        AzureResourceManager\New-AzureResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Name $deploymentName -TemplateFile $setupTemplateFileName -TemplateParameterFile $parametersFileName -Location $location
+        Write-Verbose $("Setting up a new deployment '{0}' in the resource group '{1}' using template {2}" -f $deploymentName, $ResourceGroupName, $SetupTemplateFileName)
+        AzureResourceManager\New-AzureResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Name $deploymentName -TemplateFile $SetupTemplateFileName -TemplateParameterFile $ParametersFileName -Location $location
 
-        if ($DiskAction -eq 'CopyDisks')
+        if ($CopyDisksScript -ne "" -and $(Test-Path -Path $CopyDisksScript))
         {
             Write-Verbose $("CopyDisks option was requested - all existing VHDs will now be copied to '{0}' storage account managed by ARM" -f $storageAccountName)
             Invoke-Expression -Command $copyDisksScript
@@ -472,14 +560,13 @@ function Add-AzureSMVmToRM
         Write-Verbose $("Creating a new deployment '{0}' in the resource group '{1}' using template {2}" -f $deploymentName, $ResourceGroupName, $deployTemplateFileName)
         $deploymentResult = AzureResourceManager\New-AzureResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Name $deploymentName -TemplateFile $deployTemplateFileName -TemplateParameterFile $parametersFileName -Location $location 
 
-        if ($imperativeScript)
+        if ($imperativeScript -ne "" -and $(Test-Path -Path $imperativeScript))
         {        
             # Wait for the deployment to stabilize to run the extensions
             Start-Sleep -Seconds 120
 
             Invoke-Expression -Command $imperativeScript
         }
-    }
 }
 
 function Get-CanonicalString
