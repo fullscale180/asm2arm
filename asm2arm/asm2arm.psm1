@@ -433,6 +433,7 @@ function Add-AzureSMVmToRM
     if ($DiskAction -eq 'CopyDisks')
     {
         $copyDisksScript = New-CopyVmDisksScript -VM $VM -StorageAccountName $storageAccountName -ResourceGroupName $ResourceGroupName
+        Write-Verbose $("Generating the script for copying the disk blobs and writing output to {0}" -f $copyDisksScriptFileName)
         $copyDisksScript | Out-File $copyDisksScriptFileName -Force
     }
 
