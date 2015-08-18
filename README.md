@@ -15,7 +15,7 @@ We recommend you to start without the -Deploy option, and look at the generated 
 
 ## What does it do?
  1. Either copies the VMs disks over to an ARM storage account, or creates brand new ones (you are responsible to re-establish the state)
- 2.  Creates a new virtual network, if the source VM is not in a VNET already, or uses the same name for the new VNET if it is in one. Same is true for subnets.
+ 2. Creates a new virtual network, if the source VM is not in a VNET already, or uses the same name for the new VNET if it is in one. Same is true for subnets.
  3. It can either stop short of generating ARM templates and imperative script, or use those to deploy your new resources
  4. Creates an availability set if the VM is in one
  5. Creates a public IP if the VM is available on the internet
@@ -55,11 +55,11 @@ We can refer to that VM in two ways using the cmdlet, ( -AppendTimeStampForFiles
 ``` PowerShell
 $vm = Azure\Get-AzureVm -ServiceName acloudservice -Name atestvm
  
- Add-AzureSMVmToRM -VM $vm -ResourceGroupName aresourcegroupname -DiskAction CopyDisks -OutputFileFolder D:\myarmtemplates -OutputFileNameBase abasename -AppendTimeStampForFiles -Deploy
+ Add-AzureSMVmToRM -VM $vm -ResourceGroupName aresourcegroupname -DiskAction CopyDisks -OutputFileFolder D:\myarmtemplates -AppendTimeStampForFiles -Deploy
 ```
 * Using the service name and VM name parameters directly
 ``` PowerShell
-	Add-AzureSMVmToRM -ServiceName acloudservice -Name atestvm -ResourceGroupName aresourcegroupname -DiskAction CopyDisks -OutputFileFolder D:\myarmtemplates -OutputFileNameBase abasename -AppendTimeStampForFiles -Deploy
+	Add-AzureSMVmToRM -ServiceName acloudservice -Name atestvm -ResourceGroupName aresourcegroupname -DiskAction CopyDisks -OutputFileFolder D:\myarmtemplates -AppendTimeStampForFiles -Deploy
 ```
 
 The cmdlet honors the -verbose option. Set that option to see the detailed diagnosis information.
@@ -68,12 +68,13 @@ The high-level operating principle of the cmdlet is to go through steps for clon
 Those hash tables representing the resources are appended to an array, later turned into a template by serialized to JSON, and written to a file.
 
 The template creates 3 or 4 files depending on the existence of VM agent extensions. Those are all placed in the directory specified by OutputFileFolder parameter. The files are:
-1. `<OutputFileNameBase>-setup.json`: This file represents the resources that are needed to be prepared before the VM is cloned, and potentially be the same for any subsequent VMs (we do not maintain state between subsequent runs, but since a storage account needs to be provisioned before a blob copy operation happens, which is done imperatively, it was only logical to group like resources into one)
-2. `<OutputFileNameBase>-deploy.json`: Contains the template for the VM
-3. `<OutputFileNameBase>-parameters.json`: Contains the actual parameters passed to the templates
-4. `<OutputFileNameBase>-setextensions.json`: a set of PowerShell commandlets to be run for setting the VM agent extensions.
+1. `<ServiceName>-<VMName>-setup<optional timestamp>.json`: This file represents the resources that are needed to be prepared before the VM is cloned, and potentially be the same for any subsequent VMs (we do not maintain state between subsequent runs, but since a storage account needs to be provisioned before a blob copy operation happens, which is done imperatively, it was only logical to group like resources into one)
+2. `<ServiceName>-<VMName>-deploy<optional timestamp>.json`: Contains the template for the VM
+3. `<ServiceName>-<VMName>-parameters<optional timestamp>.json`: Contains the actual parameters passed to the templates
+4. `<ServiceName>-<VMName>-setextensions<optional timestamp>.json`: a set of PowerShell commandlets to be run for setting the VM agent extensions.
+4. `<ServiceName>-<VMName>-copydisks<optional timestamp>.json`: a set of PowerShell commandlets to be run for copying disk blobs, if CopyDisks option is specified.
 
-If the -Deploy flag is set, after generating the files, the cmdlet then deploys the <OutputFileNameBase>-setup.json template, copies the source VM disk blobs if the DiskAction parameter is set to CopyDisks and then deploys the <OutputFileNameBase>-deploy.json template, using the <OutputFileNameBase>-parameters.json file for parameters. Once the deployment of the VM is done, if there is an imperative script (for VM agent extensions), the script is executed.
+If the -Deploy flag is set, after generating the files, the cmdlet then deploys the <ServiceName>-<VMName>-setup.json template, copies the source VM disk blobs if the DiskAction parameter is set to CopyDisks and then deploys the <ServiceName>-<VMName>-deploy.json template, using the <ServiceName>-<VMName>-parameters.json file for parameters. Once the deployment of the VM is done, if there is an imperative script (for VM agent extensions), the script is executed.
 
 ### Network details
 The cmdlet's intent is not to clone the ASM network settings to ARM. It utilizes the networking facilities in a way that is the most convenient for cloning the VM itself. Here is what happens on different conditions:
