@@ -458,11 +458,11 @@ function Add-AzureSMVmToRM
     if($Deploy.IsPresent)
     {
         
-        New-AzureSmToVmDeployment -ResourceGroupName $ResourceGroupName -Location $location -ServiceName $vm.ServiceName -Name $vm.Name `
+        New-AzureSmToRMDeployment -ResourceGroupName $ResourceGroupName -Location $location -ServiceName $vm.ServiceName -Name $vm.Name `
             -SetupTemplateFileName $setupTemplateFileName -ParametersFileName $parametersFileName -DeployTemplateFileName $deployTemplateFileName `
             -CopyDisksScript $copyDisksScriptFileName -ImperativeScript $imperativeScript
     } else {
-            $deployCommandletCall = 'New-AzureSmToVmDeployment -ResourceGroupName ''{0}'' -Location ''{1}'' -ServiceName ''{2}'' -Name ''{3}''' `
+            $deployCommandletCall = 'New-AzureSmToRMDeployment -ResourceGroupName ''{0}'' -Location ''{1}'' -ServiceName ''{2}'' -Name ''{3}''' `
                             -f $ResourceGroupName, $location, $vm.ServiceName, $vm.Name
             $deployCommandletCall += '-SetupTemplateFileName ''{0}'' -ParametersFileName ''{1}'' -DeployTemplateFileName ''{2}'' ' `
                                     -f $setupTemplateFileName, $parametersFileName, $deployTemplateFileName
@@ -492,7 +492,7 @@ function Add-AzureSMVmToRM
    
 
 #>
-function New-AzureSmToVmDeployment 
+function New-AzureSmToRMDeployment 
 {
     [CmdletBinding(PositionalBinding=$false,
                   ConfirmImpact='Medium')]
@@ -598,7 +598,7 @@ function Get-CanonicalString
     return ($($original -replace [regex]'^[0-9]*','') -replace [regex]'[^a-zA-Z0-9]','').ToLower()
 }
 
-function Start-HyperboliclWaitForStorageAccount
+function Start-HyperbolicWaitForStorageAccount
 {
     Param(
         $startSeconds,
