@@ -60,10 +60,11 @@ Those hash tables representing the resources are appended to an array, later tur
 
 The template creates files depending on the existence of VM agent extensions and DiskAction option value. Those are all placed in the directory specified by OutputFileFolder parameter. The files are:
 1. `<ServiceName>-<VMName>-setup<optional timestamp>.json`: This file represents the resources that are needed to be prepared before the VM is cloned, and potentially be the same for any subsequent VMs (we do not maintain state between subsequent runs, but since a storage account needs to be provisioned before a blob copy operation happens, which is done imperatively, it was only logical to group like resources into one)
-2. `<ServiceName>-<VMName>-deploy<optional timestamp>.json`: Contains the template for the VM
-3. `<ServiceName>-<VMName>-parameters<optional timestamp>.json`: Contains the actual parameters passed to the templates
-4. `<ServiceName>-<VMName>-setextensions<optional timestamp>.json`: a set of PowerShell commandlets to be run for setting the VM agent extensions.
-4. `<ServiceName>-<VMName>-copydisks<optional timestamp>.json`: a set of PowerShell commandlets to be run for copying disk blobs, if CopyDisks option is specified.
+
+2.  `<ServiceName>-<VMName>-deploy<optional timestamp>.json`: Contains the template for the VM
+3.  `<ServiceName>-<VMName>-parameters<optional timestamp>.json`: Contains the actual parameters passed to the templates
+4.  `<ServiceName>-<VMName>-setextensions<optional timestamp>.json`: a set of PowerShell commandlets to be run for setting the VM agent extensions.
+4.  `<ServiceName>-<VMName>-copydisks<optional timestamp>.json`: a set of PowerShell commandlets to be run for copying disk blobs, if CopyDisks option is specified.
 
 If the -Deploy flag is set, after generating the files, the commandlet then deploys the <ServiceName>-<VMName>-setup.json template, copies the source VM disk blobs if the DiskAction parameter is set to CopyDisks and then deploys the <ServiceName>-<VMName>-deploy.json template, using the <ServiceName>-<VMName>-parameters.json file for parameters. Once the deployment of the VM is done, if there is an imperative script (for VM agent extensions), or a script for copying the disks, they are executed.
 
