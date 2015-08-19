@@ -72,11 +72,11 @@ If the -Deploy flag is set, after generating the files, the commandlet then depl
 The commandlet's intent is not to clone the ASM network settings to ARM. It utilizes the networking facilities in a way that is the most convenient for cloning the VM itself. Here is what happens on different conditions:
 
 1.  No virtual network on the target resource group
-    1.1.  Source VM is not on a subnet: A default virtual network with 10.0.0.0/16 is created along with a subnet, with 10.0.0.0/22 address space.
-    1.2.  Source VM is on a subnet: The virtual network the VM is on is discovered, the specification of the virtual network, along with the subnets are copied over
+    2. Source VM is not on a subnet: A default virtual network with 10.0.0.0/16 is created along with a subnet, with 10.0.0.0/22 address space.
+    3. Source VM is on a subnet: The virtual network the VM is on is discovered, the specification of the virtual network, along with the subnets are copied over
 2.  Target resource group has a virtual network with a name `<VM virtual network>arm` (the string 'arm' is appended)
-    2. 1.  If the virtual network has a subnet with the same name and address space, use it
-    2.2.  If no suitable subnet is found, find an address block out of the existing subnets with 22 bits mask and use that one.
+    3. If the virtual network has a subnet with the same name and address space, use it
+    4. If no suitable subnet is found, find an address block out of the existing subnets with 22 bits mask and use that one.
 	
 Tested configurations
 --------
