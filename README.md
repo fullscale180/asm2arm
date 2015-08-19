@@ -41,16 +41,6 @@ How to use it?
  6. The session you start (or initialize) with bootstrap loads in two of the Azure PowerShell modules, Azure and AzureResourceManager. The standard scoping rules for PowerShell apply here. If you want to access the ASM version of Get-AzureVm, you need to scope it like Azure\Get-AzureVm, if you want to access the ARM version, then, AzureResourceManager\Get-AzureVm
 
 ## How does it work?
-Let's start with an example, assume we have a VM, named *atestvm* deployed on a cloud service *acloudservice*.
-
-This VM has
-* Size Basic_A3
-* Multiple data disks
-* RDP port is open, public port is N, local port is 3389
-* Not on a Vnet
-* Not a member of availability set
- 
-
 We can refer to that VM in two ways using the commandlet, ( -AppendTimeStampForFiles and -Deploy are optional flags)
 * Using the Azure PowerShell VM object (PersistentVMRoleContext type as the result of *Get-AzureVm* commandlet, and pass it as the value of the parameter VM, e.g.
 ``` PowerShell
