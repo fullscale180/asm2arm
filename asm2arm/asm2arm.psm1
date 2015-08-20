@@ -433,7 +433,7 @@ function Add-AzureSMVmToRM
 
     if (-not (Test-Path -Path $OutputFileFolder))
     {
-        New-Item -ItemType Directory -Path $OutputFileFolder
+        New-Item -ItemType Directory -Path $OutputFileFolder | Out-Null
     }
 
     # Dumping the setup resource template content to a file
