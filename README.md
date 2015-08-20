@@ -40,8 +40,7 @@ or from a PowerShell session by dot-sourcing the bootstrap.ps1 (i.e. ". .\bootst
     ![bootstrap.ps1 from a PowerShell session](https://github.com/fullscale180/asm2arm/blob/master/docAssets/bootstrapps1.gif)
 
  3. Run Add-AzureAccount to connect to your subscription
- 4. Stay in AzureServiceManagement mode
- 5. Either bring in a VM with Get-AzureVm, or directly use ServiceName & Name combination to give the VM to the Add-AzureSMVmToRM commandlet.
+ 5. Either bring in a VM with Get-AzureVm, or directly use ServiceName & Name combination to give the VM to the Add-AzureSMVmToRM commandlet. When calling the Service Management commandlets, please use PowerShell module scoping convention, e.g. Azure\Get-AzureVm
  6. The session you start (or initialize) with bootstrap loads in two of the Azure PowerShell modules, Azure and AzureResourceManager. The standard scoping rules for PowerShell apply here. If you want to access the ASM version of Get-AzureVm, you need to scope it like Azure\Get-AzureVm, if you want to access the ARM version, then, AzureResourceManager\Get-AzureVm
 
 ## How does it work?
