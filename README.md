@@ -39,7 +39,7 @@ How to use it?
 4. Run Add-AzureAccount to connect to your subscription
 5. Either bring in a VM with Get-AzureVm, or directly use ServiceName & Name combination to give the VM to the Add-AzureSMVmToRM commandlet. 
  
-Please see the examples ebelow:
+Please see the examples below:
 This PowerShell session is started running bootstrap.cmd
 ![bootstrap.cmd from Windows Explorer or command line](https://github.com/fullscale180/asm2arm/blob/master/docAssets/bootstrapcmd.gif) 
 
