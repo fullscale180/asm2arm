@@ -34,9 +34,9 @@ We recommend you to start without the -Deploy option, and look at the generated 
 How to use it?
 -----------------
  1. Start with bringing in the code with "git clone https://github.com/fullscale180/asm2arm.git"
- 2. Either open a "Windows Azure PowerShell" session (shell or ISE) and dot-source "bootstrap.ps1" i.e. ". .\bootstrap.ps1", or start "bootstrap.cmd". This will create a new PS Session
+ 2. You can load the module either from the command line or Windows Explorer by running bootstrap.cmd
  ![bootstrap.cmd from Windows Explorer or command line](https://github.com/fullscale180/asm2arm/blob/master/docAssets/bootstrapcmd.gif)
-
+or from a PowerShell session by dot-sourcing the bootstrap.ps1 (i.e. ". .\bootstrap.ps1", notice the "." space and full path to the file)
     ![bootstrap.ps1 from a PowerShell session](https://github.com/fullscale180/asm2arm/blob/master/docAssets/bootstrapps1.gif)
 
  3. Run Add-AzureAccount to connect to your subscription
