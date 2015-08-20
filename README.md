@@ -33,15 +33,16 @@ We recommend you to start without the -Deploy option, and look at the generated 
  
 How to use it?
 -----------------
- 1. Start with bringing in the code with "git clone https://github.com/fullscale180/asm2arm.git"
- 2. You can load the module either from the command line or Windows Explorer by running bootstrap.cmd
+1. Start with bringing in the code with "git clone https://github.com/fullscale180/asm2arm.git"
+2. You can load the module either from the command line or Windows Explorer by running bootstrap.cmd
  ![bootstrap.cmd from Windows Explorer or command line](https://github.com/fullscale180/asm2arm/blob/master/docAssets/bootstrapcmd.gif)
 or from a PowerShell session by dot-sourcing the bootstrap.ps1 (i.e. ". .\bootstrap.ps1", notice the "." space and full path to the file)
     ![bootstrap.ps1 from a PowerShell session](https://github.com/fullscale180/asm2arm/blob/master/docAssets/bootstrapps1.gif)
 
- 3. Run Add-AzureAccount to connect to your subscription
- 5. Either bring in a VM with Get-AzureVm, or directly use ServiceName & Name combination to give the VM to the Add-AzureSMVmToRM commandlet. When calling the Service Management commandlets, please use PowerShell module scoping convention, e.g. Azure\Get-AzureVm
- 6. The session you start (or initialize) with bootstrap loads in two of the Azure PowerShell modules, Azure and AzureResourceManager. The standard scoping rules for PowerShell apply here. If you want to access the ASM version of Get-AzureVm, you need to scope it like Azure\Get-AzureVm, if you want to access the ARM version, then, AzureResourceManager\Get-AzureVm
+3. The session you start (or initialize) with bootstrap loads in two of the Azure PowerShell modules, Azure and AzureResourceManager. The standard scoping rules for PowerShell apply here. If you want to access the ASM version of Get-AzureVm, you need to scope it like Azure\Get-AzureVm, if you want to access the ARM version, then, AzureResourceManager\Get-AzureVm
+4. Run Add-AzureAccount to connect to your subscription
+5. Either bring in a VM with Get-AzureVm, or directly use ServiceName & Name combination to give the VM to the Add-AzureSMVmToRM commandlet. 
+ 
 
 ## How does it work?
 We can refer to that VM in two ways using the commandlet, ( -AppendTimeStampForFiles and -Deploy are optional flags)
