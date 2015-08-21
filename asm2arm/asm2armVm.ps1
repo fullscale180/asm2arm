@@ -261,21 +261,19 @@ function New-VmResource
 
         if ($VM.vm.OSVirtualHardDisk.OS -eq "Windows")
         {
-            # QUESTION TO CRP TEAM
-            # How to add windowsCOnfiguration property when there is a default WinRM endpoint?
             $winRMListeners = @()
             $winRm = @{}
 
             # Either of the two well-known endpoint names identify the presence of the WinRM endpoint on which we need to take further actions
             $winRmEndpoint = $endpoints | Where-Object {$_.Name -eq "PowerShell" -or $_.Name -eq "WinRM"}
 
-            if ($winRmEndpoint -ne $null -and $false)
+            if ($winRmEndpoint -ne $null)
             {            
               $listener = @{'protocol' = "https"}
 
               if ($WinRmCertificateName)
               {
-                $certificateUri = New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName $(New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName $WinRmCertificateName)
+                $certificateUri = Get-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName $WinRmCertificateName
                 $listener.Add('certificateUrl', $certificateUri)
               }
 
@@ -305,12 +303,12 @@ function New-VmResource
         $certificateUrls = @()
         foreach ($cert in $CertificatesToInstall)
         {
-            $certificateObject = @{'certificateUrl' = New-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName $cert; `
+            $certificateUrls += @{'certificateUrl' = Get-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName $cert; `
                                                     'certificateStore' = 'My'}
-            $certificateObject += $certificateUrls
         }
-        $secrets = @()
-        $secretsItem = @{'sourceVault' = @{'id' = '[resourceId(parameters(''{0}''), ''Microsoft.KeyVault/vaults'', ''{1}'')]' -f $KeyVaultResourceName, $KeyVaultVaultName}; `
+        
+	$secrets = @()
+        $secrets += @{'sourceVault' = @{'id' = '[resourceId(''{0}'', ''Microsoft.KeyVault/vaults'', ''{1}'')]' -f $KeyVaultResourceName, $KeyVaultVaultName}; `
                             'vaultCertificates' = $certificateUrls}
 
         if ($secrets.Count -gt 0)
@@ -397,7 +395,7 @@ function Get-AzureArmVmSize
 
 }
 
-function New-KeyVaultCertificaterUri
+function Get-KeyVaultCertificaterUri
 {
     Param
     (
@@ -405,9 +403,14 @@ function New-KeyVaultCertificaterUri
         $CertificateName
     )
 
-    $uri = "https://{0}.vault.azure.net/keys/{1}" -f $KeyVaultResourceName, $CertificateName
+    $cert = AzureResourceManager\Get-AzureKeyVaultSecret -VaultName $KeyVaultVaultName -Name $CertificateName -ErrorAction SilentlyContinue
 
-    return $uri
+    if ($cert -eq $null)
+    {
+        throw ("Cannot find the WinRM certificate {0}. Please ensure certificate is added in the {1} vault's secrets." -f $CertificateName, $KeyVaultVaultName)
+    }
+
+    return $cert.Key.kid
 }
 
 #---------------------------------------------------------------------------------------
@@ -635,6 +638,9 @@ function Get-AzureArmImageRef
 
 	if ($images.Length -gt 0)
 	{
+		# Auto-select the only available image	
+		if ($images.Length -eq 1) { return $images[0] }
+
 		Write-Host "Found the following potential images:"
 		$images | Select-Object Option, Publisher, Offer, Skus, Version | Format-Table -AutoSize -Force | Out-Host
 		$option = Read-Host -Prompt "Please type in the Option number and press Enter"

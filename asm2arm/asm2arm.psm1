@@ -76,36 +76,33 @@ function Add-AzureSMVmToRM
         [ValidateSet("NewDisks", "CopyDisks")]
         $DiskAction,
 
-        # In case the VM uses custom certificates, they need to be uploaded to KeyVault
+        # In case the VM uses a custom WinRM certificate, it needs to be uploaded to KeyVault
         # Please provide KeyVault resource name
-        [Parameter(Mandatory=$false, ParameterSetName='Custom certificates')]
-        [Parameter(ParameterSetName='Custom WinRM certificate')]
+        [Parameter(Mandatory=$false)]
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
         [string]
         $KeyVaultResourceName,
 
-        # In case the VM uses custom certificates, they need to be uploaded to KeyVault
+        # In case the VM uses a custom WinRM certificate, it needs to be uploaded to KeyVault
         # Please provide vault name
-        [Parameter(Mandatory=$false, ParameterSetName='Custom certificates')]
-        [Parameter(ParameterSetName='Custom WinRM certificate')]
+        [Parameter(Mandatory=$false)]
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
         [string]
         $KeyVaultVaultName,
 
-        # In case the VM uses custom certificates, they need to be uploaded to KeyVault
+        # In case the VM uses a custom WinRM certificate, it needs to be uploaded to KeyVault
         # Please provide certificate names that reside on the given vault
-        [Parameter(Mandatory=$false, ParameterSetName='Custom certificates')]
-        [Parameter(ParameterSetName='Custom WinRM certificate')]
+        [Parameter(Mandatory=$false)]
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
         [string[]]
         $CertificatesToInstall,
 
-        # In case the VM uses a custom WinRM certificate, they need to be uploaded to KeyVault
+        # In case the VM uses a custom WinRM certificate, it needs to be uploaded to KeyVault
         # Please name the certificate to be used for WinRM among the names provided in $CertificatesToInstall parameter
-        [Parameter(ParameterSetName='Custom WinRM certificate')]
+	[Parameter(Mandatory=$false)]
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
         [string]
@@ -157,22 +154,26 @@ function Add-AzureSMVmToRM
         return
     }
 
-    if (($VM.VM.WinRMCertificate -ne $null) -and (-not $KeyVaultResourceName -or -not $KeyVaultVaultName -or -not $WinRmCertificateThumbprint) )
+    # $KeyVaultVaultName and $KeyVaultResourceName must be supplied when $WinRmCertificateName is specified
+    if ($WinRmCertificateName -and (-not $KeyVaultResourceName -or -not $KeyVaultVaultName) )
     {
-        throw ("The VM uses a custom certificate for WinRM. Please upload it to KeyVault, and provide KeyVault resoruce name, vault name in the parameters. Thumbprint of the certificate is {0}" -f $VM.VM.WinRMCertificate)
+        throw ("Provide KeyVault name and KeyVault resource name where {0} certificate is located. Please make sure that the certificate is uploaded to the specified Key Vault location." -f $WinRmCertificateName)
     }
 
-    if ($WinRmCertificateName -and -not $CertificatesToInstall.Contains($WinRmCertificateName))
+    # $CertificatesToInstall must include $WinRmCertificateName if specified
+    if ($WinRmCertificateName -and (-not $CertificatesToInstall -or -not $CertificatesToInstall.Contains($WinRmCertificateName)))
     {
-        throw ("Please ensure WinRM certificate name {0} is included in the $CertificatesToInstall parameter" -f $WinRmCertificateName)
+        throw ("Please ensure WinRM certificate name {0} is included in the -CertificatesToInstall parameter" -f $WinRmCertificateName)
     }
 
-    if ($VM.VM.WinRMCertificate)
+    if ($WinRmCertificateName)
     {
+        # Verify whether or not the custom WinRM certificate can be found in Key Vault.
         $cert = AzureResourceManager\Get-AzureKeyVaultSecret -VaultName $KeyVaultVaultName -Name $WinRmCertificateName -ErrorAction SilentlyContinue
+
         if ($cert -eq $null)
         {
-            throw ("Cannot find the WinRM certificate {0} with thumbprint {1}. Please ensure certificate is added in the vault {2} secrets." -f $WinRmCertificateName, $VM.VM.WinRMCertificate, $KeyVaultVaultName)
+            throw ("Cannot find the WinRM certificate {0}. Please ensure certificate is added in the {1} vault's secrets." -f $WinRmCertificateName, $KeyVaultVaultName)
         }
     }
 
