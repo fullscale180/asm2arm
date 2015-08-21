@@ -410,7 +410,7 @@ function Get-KeyVaultCertificaterUri
         throw ("Cannot find the WinRM certificate {0}. Please ensure certificate is added in the {1} vault's secrets." -f $CertificateName, $KeyVaultVaultName)
     }
 
-    return $cert.Key.kid
+    return $cert.Id
 }
 
 #---------------------------------------------------------------------------------------
