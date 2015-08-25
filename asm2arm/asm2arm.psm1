@@ -581,7 +581,7 @@ function New-AzureSmToRMDeployment
 
         if ($CopyDisksScript -ne "" -and $(Test-Path -Path $CopyDisksScript))
         {
-            Start-HyperboliclWaitForStorageAccount -startSeconds 120 -resourceGroupName $ResourceGroupName -StorageAccountName $storageAccountName
+            Start-HyperbolicWaitForStorageAccount -startSeconds 120 -resourceGroupName $ResourceGroupName -StorageAccountName $storageAccountName
 
             Write-Verbose $("CopyDisks option was requested - all existing VHDs will now be copied to '{0}' storage account managed by ARM" -f $storageAccountName)
             Invoke-Expression -Command $copyDisksScript
