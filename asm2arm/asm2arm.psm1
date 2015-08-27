@@ -235,7 +235,9 @@ function Add-AzureSMVmToRM
     $vmSumbnet = ''
     $networkConfiguration = $null
     $classicSubnet = $null
+    $privateIpAddress = $null
     $vmSubnetName = ""
+
     if ($VM.VirtualNetworkName -eq $null)
     {
         $vnetName = $Global:asm2armVnetName
@@ -258,6 +260,7 @@ function Add-AzureSMVmToRM
             $networkConfiguration = $configuration[0]
             $subnetName = $networkConfiguration.SubnetNames[0]
             $classicSubnet = $virtualNetworkSite.Subnets | Where-Object {$_.Name -eq $subnetName}
+            $privateIpAddress = $networkConfiguration.StaticVirtualNetworkIPAddress
         }
     }
     
@@ -398,9 +401,9 @@ function Add-AzureSMVmToRM
     $vnetDependency = 'Microsoft.Network/virtualNetworks/{0}' -f $vnetName
 
     Write-Verbose $("Adding a resource definition for '{0}' network interface" -f $nicName)
-    
+
     $dependencies = @($ipAddressDependency)
-    $nicResource = New-NetworkInterfaceResource -Name $nicName -Location $resourceLocation -PublicIpAddressName $ipAddressName -SubnetReference $subnetRef -Dependecies $dependencies
+    $nicResource = New-NetworkInterfaceResource -Name $nicName -Location $resourceLocation -PublicIpAddressName $ipAddressName -PrivateIpAddress $privateIpAddress -SubnetReference $subnetRef -Dependencies $dependencies
     $resources += $nicResource
 
     # VM
@@ -408,7 +411,7 @@ function Add-AzureSMVmToRM
 
     $vmResource = New-VmResource -VM $VM -NetworkInterface $nicName -StorageAccountName $storageAccountName -Location $resourceLocation -LocationValue $location `
                     -ResourceGroupName $ResourceGroupName -DiskAction $DiskAction -KeyVaultResourceName $KeyVaultResourceName -KeyVaultVaultName $KeyVaultVaultName `
-                    -CertificatesToInstall $CertificatesToInstall -WinRmCertificateName $WinRmCertificateName -Dependecies @($nicDependency)
+                    -CertificatesToInstall $CertificatesToInstall -WinRmCertificateName $WinRmCertificateName -Dependencies @($nicDependency)
     $resources += $vmResource
 
     # VM extensions (e.g. custom scripts)
