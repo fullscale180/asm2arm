@@ -16,17 +16,12 @@ function Get-ScriptDirectory
 
 $scriptDirectory = Get-ScriptDirectory
 
-Set-ExecutionPolicy -Scope Process Undefined -Force
-if ($(Get-ExecutionPolicy) -eq "Restricted")
-{
-    # TODO: inform user to set execution policy? Or create a signed script...
-    Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
-}
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
  
 $azureModulesPath = Join-Path ${env:ProgramFiles(x86)} -ChildPath "Microsoft SDKs\Azure\PowerShell"
 if (Test-Path $azureModulesPath) {
        $armPath = Join-Path $azureModulesPath -ChildPath "ResourceManager"
-       Write-Output ("Adding Azure Resource Manager module path {0} to the PSModulePath" -f $armPath)
+       Write-Verbose ("Adding Azure Resource Manager module path {0} to the PSModulePath" -f $armPath)
        $env:PSModulePath = $env:PSModulePath + ";" + $armPath
 
        cd $scriptDirectory
@@ -36,6 +31,4 @@ else {
    throw "Please make sure Azure PowerShell module is installed."
 }
 
-Import-Module $($scriptDirectory + '\asm2arm')
-
-Write-Output 'Azure Service Management and Resource Manager modules are now ready to service user commands'
+Write-Verbose 'Azure Service Management and Resource Manager modules are now ready to service user commands'

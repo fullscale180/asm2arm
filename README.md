@@ -2,17 +2,17 @@
 
 Hello Azure expert! 
 
-This is a PowerShell script module for migrating your **single** Virtual Machine (VM) from Azure Service Management (ASM) stack to Azure Resource Manager (ARM) stack. It exposes two commandlets: 
+This is a PowerShell script module for migrating your **single** Virtual Machine (VM) from Azure Service Management (ASM) stack to Azure Resource Manager (ARM) stack. It exposes two cmdlets: 
 ``` PowerShell
 Add-AzureSMVmToRM
 New-AzureSmToRMDeployment
 ```
 
-The first commandlet can either generate a set of ARM templates and imperative PowerShell scripts (to copy the disk blobs and if the VM has VM Agent Extensions), given a VM, or after generating those, deploy the VM (with the -deploy flag), using the New-AzureSmToRMDeployment commandlet.
+The first cmdlet can either generate a set of ARM templates and imperative PowerShell scripts (to copy the disk blobs and if the VM has VM Agent Extensions), given a VM, or after generating those, deploy the VM (with the -deploy flag), using the New-AzureSmToRMDeployment cmdlet.
 
 As for the VM, you have the option for either creating a clone of the given VM, with the blobs backing the disks (both OS and data) copied, or built one using the source as a recipe with completely new disks.
 
-We recommend you to start without the -Deploy option, and look at the generated files. After looking at the generated files and you feel confident, run the scripts and deploy the templates using the New-AzureSmToRMDeployment commandlet. If the Add-AzureSMVmToRM is run without the -Deploy switch, it generates a line to run the New-AzureSMToRMDeployment commandlet.
+We recommend you to start without the -Deploy option, and look at the generated files. After looking at the generated files and you feel confident, run the scripts and deploy the templates using the New-AzureSmToRMDeployment cmdlet. If the Add-AzureSMVmToRM is run without the -Deploy switch, it generates a line to run the New-AzureSMToRMDeployment cmdlet.
 
 ## What does it do?
  1. Either copies the VMs disks over to an ARM storage account, or creates brand new ones (you are responsible to re-establish the state)
@@ -37,7 +37,7 @@ How to use it?
 2. You can load the module either from the command line or Windows Explorer by running bootstrap.cmd or from a PowerShell session by dot-sourcing the bootstrap.ps1 (i.e. ". .\bootstrap.ps1", notice the "." space and full path to the file)
 3. The session you start (or initialize) with bootstrap loads in two of the Azure PowerShell modules, Azure and AzureResourceManager. The standard scoping rules for PowerShell apply here. If you want to access the ASM version of Get-AzureVm, you need to scope it like Azure\Get-AzureVm, if you want to access the ARM version, then, AzureResourceManager\Get-AzureVm
 4. Run Add-AzureAccount to connect to your subscription
-5. Either bring in a VM with Get-AzureVm, or directly use ServiceName & Name combination to give the VM to the Add-AzureSMVmToRM commandlet. 
+5. Either bring in a VM with Get-AzureVm, or directly use ServiceName & Name combination to give the VM to the Add-AzureSMVmToRM cmdlet. 
  
 Please see the examples below:
 This PowerShell session is started running bootstrap.cmd
@@ -48,8 +48,8 @@ Whereas this one is started by dot-sourcing bootstrap.ps1 file from within an ex
 
 
 ## How does it work?
-We can refer to that VM in two ways using the commandlet, ( -AppendTimeStampForFiles and -Deploy are optional flags)
-* Using the Azure PowerShell VM object (PersistentVMRoleContext type as the result of *Get-AzureVm* commandlet, and pass it as the value of the parameter VM, e.g.
+We can refer to that VM in two ways using the cmdlet, ( -AppendTimeStampForFiles and -Deploy are optional flags)
+* Using the Azure PowerShell VM object (PersistentVMRoleContext type as the result of *Get-AzureVm* cmdlet, and pass it as the value of the parameter VM, e.g.
 ``` PowerShell
 $vm = Azure\Get-AzureVm -ServiceName acloudservice -Name atestvm
  
@@ -60,9 +60,9 @@ $vm = Azure\Get-AzureVm -ServiceName acloudservice -Name atestvm
 	Add-AzureSMVmToRM -ServiceName acloudservice -Name atestvm -ResourceGroupName aresourcegroupname -DiskAction CopyDisks -OutputFileFolder D:\myarmtemplates -AppendTimeStampForFiles -Deploy
 ```
 
-The commandlet honors the -verbose option. Set that option to see the detailed diagnosis information.
+The cmdlet honors the -verbose option. Set that option to see the detailed diagnosis information.
 
-The high-level operating principle of the commandlet is to go through steps for cloning the VM, and generate resources as custom PowerShell hash tables for Storage, Network and Compute resource providers.
+The high-level operating principle of the cmdlet is to go through steps for cloning the VM, and generate resources as custom PowerShell hash tables for Storage, Network and Compute resource providers.
 Those hash tables representing the resources are appended to an array, later turned into a template by serialized to JSON, and written to a file.
 
 The template creates files depending on the existence of VM agent extensions and DiskAction option value. Those are all placed in the directory specified by OutputFileFolder parameter. The files are:
@@ -70,13 +70,13 @@ The template creates files depending on the existence of VM agent extensions and
 
 2.  `<ServiceName>-<VMName>-deploy<optional timestamp>.json`: Contains the template for the VM
 3.  `<ServiceName>-<VMName>-parameters<optional timestamp>.json`: Contains the actual parameters passed to the templates
-4.  `<ServiceName>-<VMName>-setextensions<optional timestamp>.json`: a set of PowerShell commandlets to be run for setting the VM agent extensions.
-4.  `<ServiceName>-<VMName>-copydisks<optional timestamp>.json`: a set of PowerShell commandlets to be run for copying disk blobs, if CopyDisks option is specified.
+4.  `<ServiceName>-<VMName>-setextensions<optional timestamp>.json`: a set of PowerShell cmdlets to be run for setting the VM agent extensions.
+4.  `<ServiceName>-<VMName>-copydisks<optional timestamp>.json`: a set of PowerShell cmdlets to be run for copying disk blobs, if CopyDisks option is specified.
 
-If the -Deploy flag is set, after generating the files, the commandlet then deploys the <ServiceName>-<VMName>-setup.json template, copies the source VM disk blobs if the DiskAction parameter is set to CopyDisks and then deploys the <ServiceName>-<VMName>-deploy.json template, using the <ServiceName>-<VMName>-parameters.json file for parameters. Once the deployment of the VM is done, if there is an imperative script (for VM agent extensions), or a script for copying the disks, they are executed.
+If the -Deploy flag is set, after generating the files, the cmdlet then deploys the <ServiceName>-<VMName>-setup.json template, copies the source VM disk blobs if the DiskAction parameter is set to CopyDisks and then deploys the <ServiceName>-<VMName>-deploy.json template, using the <ServiceName>-<VMName>-parameters.json file for parameters. Once the deployment of the VM is done, if there is an imperative script (for VM agent extensions), or a script for copying the disks, they are executed.
 
 ### Network details
-The commandlet's intent is not to clone the ASM network settings to ARM. It utilizes the networking facilities in a way that is the most convenient for cloning the VM itself. Here is what happens on different conditions:
+The cmdlet's intent is not to clone the ASM network settings to ARM. It utilizes the networking facilities in a way that is the most convenient for cloning the VM itself. Here is what happens on different conditions:
 
 1.  No virtual network on the target resource group
     2. Source VM is not on a subnet: A default virtual network with 10.0.0.0/16 is created along with a subnet, with 10.0.0.0/22 address space.
@@ -87,7 +87,7 @@ The commandlet's intent is not to clone the ASM network settings to ARM. It util
 	
 Tested configurations
 --------
-The _Add-AzureSMVmToRM_ commandlet was validated using the following test cases:
+The _Add-AzureSMVmToRM_ cmdlet was validated using the following test cases:
 
 | Test Case ID | Description |
 |:---|:---|
