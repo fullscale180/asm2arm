@@ -239,7 +239,7 @@ function New-VmResource
         $CertificatesToInstall,
         $WinRmCertificateName,
         [string[]]
-        $Dependecies
+        $Dependencies
 	)
 
     
@@ -330,7 +330,7 @@ function New-VmResource
     $computeResourceProvider = "Microsoft.Compute/virtualMachines"
     $crpApiVersion = $Global:apiVersion        
 
-    $resource = New-ResourceTemplate -Type $computeResourceProvider -Name $VM.Name -Location $Location -ApiVersion $crpApiVersion -Properties $properties -DependsOn $Dependecies
+    $resource = New-ResourceTemplate -Type $computeResourceProvider -Name $VM.Name -Location $Location -ApiVersion $crpApiVersion -Properties $properties -DependsOn $Dependencies
 
     return $resource
 }

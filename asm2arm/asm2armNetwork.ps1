@@ -60,25 +60,38 @@ function New-NetworkInterfaceResource
         [string]
         $SubnetReference,
         [string]
+        $PrivateIpAddress,
+        [string]
         $PublicIpAddressName,
         [string[]]
-        $Dependecies
+        $Dependencies
     )
     
-    $publicIPAddress = @{'id' = '[resourceId(''Microsoft.Network/publicIPAddresses'',''{0}'')]' -f $PublicIpAddressName;}
     $subnet = @{'id' = $SubnetReference;}
+    $ipConfigurations = @{ 'subnet' = $subnet;}
 
-    $ipConfigurations = @{ `
-        'privateIPAllocationMethod' = "Dynamic"; `
-        'publicIPAddress' = $publicIPAddress; `
-        'subnet' = $subnet;}
+    if($PublicIpAddressName)
+    {
+        $publicIPAddress = @{'id' = '[resourceId(''Microsoft.Network/publicIPAddresses'',''{0}'')]' -f $PublicIpAddressName;}
+        $ipConfigurations.Add('publicIPAddress', $publicIPAddress);
+    }
+
+    # Static and dynamic IPs will result in different property sets
+    if($PrivateIpAddress)
+    {
+        $ipConfigurations.Add('privateIPAllocationMethod', 'Static');
+        $ipConfigurations.Add('privateIPAddress', $PrivateIpAddress);
+    }
+    else
+    {
+        $ipConfigurations.Add('privateIPAllocationMethod', 'Dynamic');
+    }
 
     $ipConfigName = "{0}_config1" -f $Name
-
     $createProperties = @{'ipConfigurations' =  @(@{'name' =  $ipConfigName; 'properties' = $ipConfigurations;})}
 
     $resource = New-ResourceTemplate -Type "Microsoft.Network/networkInterfaces" -Name $Name `
-        -Location $Location -ApiVersion $Global:apiVersion -Properties $createProperties -DependsOn $Dependecies
+        -Location $Location -ApiVersion $Global:apiVersion -Properties $createProperties -DependsOn $Dependencies
 
     return $resource
 }
