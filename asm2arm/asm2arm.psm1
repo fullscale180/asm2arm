@@ -185,7 +185,6 @@ function Add-AzureSMVmToRM
         [ValidateScript({
             if ($_ -and (-not $CertificatesToInstall -or -not $CertificatesToInstall.Contains($_)))
             {
-                Write-Error ("Please ensure WinRM certificate name {0} is included in the -CertificatesToInstall parameter" -f $WinRmCertificateName)
                 return $false
             }
             return $true
