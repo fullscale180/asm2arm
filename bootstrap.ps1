@@ -30,6 +30,4 @@ else {
    throw "Please make sure Azure PowerShell module is installed on this machine."
 }
 
-Import-Module (Join-Path $PSScriptRoot -ChildPath 'asm2arm')
-
 Write-Verbose 'Azure Service Management and Resource Manager modules are now ready to service user commands'
