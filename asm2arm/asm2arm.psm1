@@ -174,12 +174,12 @@ function Add-AzureSMVmToRM
 
         # In case the VM uses a custom WinRM certificate, it needs to be uploaded to KeyVault
         # Please name the certificate to be used for WinRM among the names provided in $CertificatesToInstall parameter
-        [Parameter(Mandatory=$false, ParameterSetName='Service and VM names with custom certificate no files generated and deploy')]
-        [Parameter(Mandatory=$false, ParameterSetName='Service and VM names with custom certificate with files generated no deploy')]
-        [Parameter(Mandatory=$false, ParameterSetName='Service and VM names with custom certificate with files generated and deploy')]
-        [Parameter(Mandatory=$false, ParameterSetName='VM object with custom certificate no files generated and deploy')]
-        [Parameter(Mandatory=$false, ParameterSetName='VM object with custom certificate with files generated no deploy')]
-        [Parameter(Mandatory=$false, ParameterSetName='VM object with custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated and deploy')]
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
         [ValidateScript({
