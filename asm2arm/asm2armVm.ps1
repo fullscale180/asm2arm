@@ -301,18 +301,19 @@ function New-VmResource
         }
 
         $certificateUrls = @()
+
         foreach ($cert in $CertificatesToInstall)
         {
             $certificateUrls += @{'certificateUrl' = Get-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName $cert; `
                                                     'certificateStore' = 'My'}
         }
         
-	$secrets = @()
-        $secrets += @{'sourceVault' = @{'id' = '[resourceId(''{0}'', ''Microsoft.KeyVault/vaults'', ''{1}'')]' -f $KeyVaultResourceName, $KeyVaultVaultName}; `
-                            'vaultCertificates' = $certificateUrls}
-
-        if ($secrets.Count -gt 0)
+        if ($certificateUrls.Count -gt 0)
         {
+            $secrets = @()
+            $secrets += @{'sourceVault' = @{'id' = '[resourceId(''{0}'', ''Microsoft.KeyVault/vaults'', ''{1}'')]' -f $KeyVaultResourceName, $KeyVaultVaultName}; `
+                                'vaultCertificates' = $certificateUrls}
+
             $osProfile.Add('secrets', $secrets)
         }
 
