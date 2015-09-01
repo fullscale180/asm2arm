@@ -241,7 +241,6 @@ function New-VmResource
         [string[]]
         $Dependencies
 	)
-
     
     $properties = @{}
     if ($vm.AvailabilitySetName)
@@ -269,15 +268,18 @@ function New-VmResource
 
             if ($winRmEndpoint -ne $null)
             {            
-              $listener = @{'protocol' = "https"}
-
               if ($WinRmCertificateName)
               {
+                $listener = @{'protocol' = "https"}
                 $certificateUri = Get-KeyVaultCertificaterUri -KeyVaultVaultName $KeyVaultVaultName -CertificateName $WinRmCertificateName
-                $listener.Add('certificateUrl', $certificateUri)
-              }
 
-              $winRm.Add('listeners', @($listener));
+                $listener.Add('certificateUrl', $certificateUri)
+                $winRm.Add('listeners', @($listener))
+              }
+              else
+              {
+                Write-Warning $("Virtual machine '{0}' contains a definition for the WinRM endpoint '{1}'. To migrate this endpoint, a certificate must be specified using -WinRmCertificateName parameter" -f $vm.Name, $winRmEndpoint.Name)
+              }
             }
 
             $windowsConfiguration = @{
