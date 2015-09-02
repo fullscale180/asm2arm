@@ -10,25 +10,18 @@
 
 #requires -module azure
 
+# Support advanced function behavior, for -Verbose flag.
 [CmdletBinding()]
 param()
 
 <#
 The following section exists with a special purpose, that is for being able to load the two required Azure modules (Service Management and Resource Manager) together.
 Azure PowerShell module installer does not modify the PSModulePath variable. Using this part of the code, we are adding the location of both ARM and ASM modules to the path. 
-Just using #requires will not bring in the AzureResourceManager module in. 
+Just using #requires will not bring in the AzureResourceManager module in but will make sure the module is installed.
 #>
-$azureModulesPath = Join-Path ${env:ProgramFiles(x86)} -ChildPath "Microsoft SDKs\Azure\PowerShell"
-if (Test-Path $azureModulesPath) {
-       $armPath = Join-Path $azureModulesPath -ChildPath "ResourceManager"
-       
-       Write-Verbose ("Adding Azure Resource Manager module path {0} to the PSModulePath environment variable" -f $armPath)
-       $env:PSModulePath = $env:PSModulePath + ";" + $armPath
-}
-else {
-   # If we detect the Azure PowerShell is not on the system, we just inform the user.
-   throw "Please make sure Azure PowerShell module is installed on this machine."
-}
+$armPath = Join-Path ${env:ProgramFiles(x86)} -ChildPath "Microsoft SDKs\Azure\PowerShell\ResourceManager"
+Write-Verbose ("Adding Azure Resource Manager module path {0} to the PSModulePath environment variable" -f $armPath)
+$env:PSModulePath = $env:PSModulePath + ";" + $armPath
 
 Import-Module (Join-Path $PSScriptRoot -ChildPath 'asm2arm')
 
