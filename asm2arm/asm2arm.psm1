@@ -18,67 +18,129 @@
    VM image catalog, then creates an ARM template to be deployed to the ARM stack.
    The target VM needs to be in stopped state. If the machine is not stopped, the cmdlet will exit.
 .EXAMPLE
-   
-.EXAMPLE
-   
-.INPUTS
-   Inputs to this cmdlet (if any)
-.OUTPUTS
-   Output from this cmdlet (if any)
-.NOTES
-   General notes
-.COMPONENT
-   The component this cmdlet belongs to
-.ROLE
-   The role this cmdlet belongs to
-.FUNCTIONALITY
-   The functionality that best describes this cmdlet
+    This is the most common and recommended senario. Generate the files for a VM specified by the service name and name but do not deploy.
+    Add-AzureSMVmToRM -ServiceName <String> -Name <String> -ResourceGroupName <String> -DiskAction <Object> -OutputFileFolder <String> [-AppendTimeStampForFiles] [<CommonParameters>]
+.EXAMPLE        
+    Add-AzureSMVmToRM -ServiceName <String> -Name <String> -ResourceGroupName <String> -DiskAction <Object> -Deploy [<CommonParameters>]
+.EXAMPLE  
+    This is the most common and recommended senario. Given a VM, generate files but do not deploy
+    Add-AzureSMVmToRM -VM <PersistentVMRoleContext> -ResourceGroupName <String> -DiskAction <Object> -OutputFileFolder <String> [-AppendTimeStampForFiles] [<CommonParameters>]
+.EXAMPLE    
+    Add-AzureSMVmToRM -VM <PersistentVMRoleContext> -ResourceGroupName <String> -DiskAction <Object> -Deploy [<CommonParameters>]     
+.EXAMPLE    
+    Deploy a VM specified by the service name and name with custom certificates, also generate files
+    Add-AzureSMVmToRM -ServiceName <String> -Name <String> -ResourceGroupName <String> -DiskAction <Object> -OutputFileFolder <String> [-AppendTimeStampForFiles] -Deploy [<CommonParameters>]    
+.EXAMPLE 
+    Deploy a VM specified by the service name and name with custom certificates, while generating files
+    Add-AzureSMVmToRM -ServiceName <String> -Name <String> -ResourceGroupName <String> -DiskAction <Object> -KeyVaultResourceName <String> -KeyVaultVaultName <String> -CertificatesToInstall 
+    <String[]> [-WinRmCertificateName <String>] -OutputFileFolder <String> [-AppendTimeStampForFiles] -Deploy [<CommonParameters>]
+.EXAMPLE 
+    Start with a VM specified by the service name and name with custom certificates, generate files but do not depoy
+    Add-AzureSMVmToRM -ServiceName <String> -Name <String> -ResourceGroupName <String> -DiskAction <Object> -KeyVaultResourceName <String> -KeyVaultVaultName <String> -CertificatesToInstall 
+    <String[]> [-WinRmCertificateName <String>] -OutputFileFolder <String> [-AppendTimeStampForFiles] [<CommonParameters>]
+.EXAMPLE    
+    Deploy a VM specified by the service name and name with custom certificates, do not generate files
+    Add-AzureSMVmToRM -ServiceName <String> -Name <String> -ResourceGroupName <String> -DiskAction <Object> -KeyVaultResourceName <String> -KeyVaultVaultName <String> -CertificatesToInstall 
+    <String[]> [-WinRmCertificateName <String>] -Deploy [<CommonParameters>]
+.EXAMPLE  
+    Deploy a VM with custom certificates, while generating files  
+    Add-AzureSMVmToRM -VM <PersistentVMRoleContext> -ResourceGroupName <String> -DiskAction <Object> -KeyVaultResourceName <String> -KeyVaultVaultName <String> -CertificatesToInstall 
+    <String[]> [-WinRmCertificateName <String>] -OutputFileFolder <String> [-AppendTimeStampForFiles] -Deploy [<CommonParameters>]
+.EXAMPLE  
+    Only generate files for a VM with custom certificates    
+    Add-AzureSMVmToRM -VM <PersistentVMRoleContext> -ResourceGroupName <String> -DiskAction <Object> -KeyVaultResourceName <String> -KeyVaultVaultName <String> -CertificatesToInstall 
+    <String[]> [-WinRmCertificateName <String>] -OutputFileFolder <String> [-AppendTimeStampForFiles] [<CommonParameters>]
+.EXAMPLE    
+    Deploy a VM with custom certificates, but not generate files  
+    Add-AzureSMVmToRM -VM <PersistentVMRoleContext> -ResourceGroupName <String> -DiskAction <Object> -KeyVaultResourceName <String> -KeyVaultVaultName <String> -CertificatesToInstall 
+    <String[]> [-WinRmCertificateName <String>] -Deploy [<CommonParameters>]
+.EXAMPLE    
+    Add-AzureSMVmToRM -VM <PersistentVMRoleContext> -ResourceGroupName <String> -DiskAction <Object> -OutputFileFolder <String> [-AppendTimeStampForFiles] -Deploy [<CommonParameters>]
 #>
 function Add-AzureSMVmToRM
 {
-    [CmdletBinding(DefaultParameterSetName='Service and VM Name', 
+    [CmdletBinding(DefaultParameterSetName='Service and VM names no custom certificate with files generated no deploy', 
                   PositionalBinding=$false,
                   ConfirmImpact='Medium')]
     Param
     (
         # ServiceName the VM is deployed on
-        [Parameter(Mandatory=$true, 
-                   ParameterSetName='Service and VM Name')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names no custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names no custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names no custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated and deploy')]
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
         [string]
         $ServiceName,
 
         # Name of the VM
-        [Parameter(Mandatory=$true, 
-                   ParameterSetName='Service and VM Name')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names no custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names no custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names no custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated and deploy')]
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
         [string]
         $Name,
 
         # VM Object
-        [Parameter(Mandatory=$true, 
-                   ParameterSetName='VM only')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object no custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object no custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object no custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated and deploy')]
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
         [Microsoft.WindowsAzure.Commands.ServiceManagement.Model.PersistentVMRoleContext]
         $VM,
 
         # Name of the Resource Group the deployment is going to be placed into
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names no custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names no custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names no custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object no custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object no custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object no custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated and deploy')]
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
         [string]
         $ResourceGroupName,
 
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names no custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names no custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names no custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object no custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object no custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object no custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated and deploy')]
         [ValidateSet("NewDisks", "CopyDisks")]
         $DiskAction,
 
         # In case the VM uses a custom WinRM certificate, it needs to be uploaded to KeyVault
         # Please provide KeyVault resource name
-        [Parameter(Mandatory=$false)]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated and deploy')]
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
         [string]
@@ -86,7 +148,12 @@ function Add-AzureSMVmToRM
 
         # In case the VM uses a custom WinRM certificate, it needs to be uploaded to KeyVault
         # Please provide vault name
-        [Parameter(Mandatory=$false)]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated and deploy')]
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
         [string]
@@ -94,7 +161,12 @@ function Add-AzureSMVmToRM
 
         # In case the VM uses a custom WinRM certificate, it needs to be uploaded to KeyVault
         # Please provide certificate names that reside on the given vault
-        [Parameter(Mandatory=$false)]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated and deploy')]
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
         [string[]]
@@ -102,31 +174,64 @@ function Add-AzureSMVmToRM
 
         # In case the VM uses a custom WinRM certificate, it needs to be uploaded to KeyVault
         # Please name the certificate to be used for WinRM among the names provided in $CertificatesToInstall parameter
-	[Parameter(Mandatory=$false)]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated and deploy')]
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
+        [ValidateScript({
+            if ($_ -and (-not $CertificatesToInstall -or -not $CertificatesToInstall.Contains($_)))
+            {
+                return $false
+            }
+            return $true
+        })]
         [string]
         $WinRmCertificateName,
 
         # Folder for the generated template and parameter files
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names no custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names no custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object no custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object no custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated and deploy')]
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
         [string]
         $OutputFileFolder,
 
         # Generate timestamp in the file name or not, default is to generate the timestamp
-        [Parameter(Mandatory=$false)]        
+        [Parameter(Mandatory=$false, ParameterSetName='Service and VM names no custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$false, ParameterSetName='Service and VM names no custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$false, ParameterSetName='Service and VM names with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$false, ParameterSetName='Service and VM names with custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$false, ParameterSetName='VM object no custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$false, ParameterSetName='VM object no custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$false, ParameterSetName='VM object with custom certificate with files generated no deploy')]
+        [Parameter(Mandatory=$false, ParameterSetName='VM object with custom certificate with files generated and deploy')]     
         [switch]
         $AppendTimeStampForFiles,
 
         # Kick off a new deployment automatically after generating the ARM template files
-        [Parameter(Mandatory=$false)]        
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names no custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names no custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='Service and VM names with custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object no custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object no custom certificate with files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate no files generated and deploy')]
+        [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated and deploy')]
         [switch]
         $Deploy
     )
 
-    if ($psCmdlet.ParameterSetName -eq "Service and VM Name")
+    if ($psCmdlet.ParameterSetName -like "Service and VM names*")
     { 
         $lastError = $null
         $VM = Azure\Get-AzureVM -ServiceName $ServiceName -Name $Name -ErrorAction SilentlyContinue -ErrorVariable $lastError
@@ -152,18 +257,6 @@ function Add-AzureSMVmToRM
         $vmMessage = "The VM {0} on service {1} needs to be stopped. It's power state is {2}" -f $vm.Name, $vm.ServiceName, $vm.PowerState
         Write-Error $vmMessage
         return
-    }
-
-    # $KeyVaultVaultName and $KeyVaultResourceName must be supplied when $WinRmCertificateName is specified
-    if ($WinRmCertificateName -and (-not $KeyVaultResourceName -or -not $KeyVaultVaultName) )
-    {
-        throw ("Provide KeyVault name and KeyVault resource name where {0} certificate is located. Please make sure that the certificate is uploaded to the specified Key Vault location." -f $WinRmCertificateName)
-    }
-
-    # $CertificatesToInstall must include $WinRmCertificateName if specified
-    if ($WinRmCertificateName -and (-not $CertificatesToInstall -or -not $CertificatesToInstall.Contains($WinRmCertificateName)))
-    {
-        throw ("Please ensure WinRM certificate name {0} is included in the -CertificatesToInstall parameter" -f $WinRmCertificateName)
     }
 
     if ($WinRmCertificateName)
