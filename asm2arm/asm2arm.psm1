@@ -33,27 +33,27 @@
 .EXAMPLE 
     Deploy a VM specified by the service name and name with custom certificates, while generating files
     Add-AzureSMVmToRM -ServiceName <String> -Name <String> -ResourceGroupName <String> -DiskAction <Object> -KeyVaultResourceName <String> -KeyVaultVaultName <String> -CertificatesToInstall 
-    <String[]> [-WinRmCertificateName <String>] -OutputFileFolder <String> [-AppendTimeStampForFiles] -Deploy [<CommonParameters>]
+    <String[]> -WinRmCertificateName <String> -OutputFileFolder <String> [-AppendTimeStampForFiles] -Deploy [<CommonParameters>]
 .EXAMPLE 
     Start with a VM specified by the service name and name with custom certificates, generate files but do not depoy
     Add-AzureSMVmToRM -ServiceName <String> -Name <String> -ResourceGroupName <String> -DiskAction <Object> -KeyVaultResourceName <String> -KeyVaultVaultName <String> -CertificatesToInstall 
-    <String[]> [-WinRmCertificateName <String>] -OutputFileFolder <String> [-AppendTimeStampForFiles] [<CommonParameters>]
+    <String[]> -WinRmCertificateName <String> -OutputFileFolder <String> [-AppendTimeStampForFiles] [<CommonParameters>]
 .EXAMPLE    
     Deploy a VM specified by the service name and name with custom certificates, do not generate files
     Add-AzureSMVmToRM -ServiceName <String> -Name <String> -ResourceGroupName <String> -DiskAction <Object> -KeyVaultResourceName <String> -KeyVaultVaultName <String> -CertificatesToInstall 
-    <String[]> [-WinRmCertificateName <String>] -Deploy [<CommonParameters>]
+    <String[]> -WinRmCertificateName <String> -Deploy [<CommonParameters>]
 .EXAMPLE  
     Deploy a VM with custom certificates, while generating files  
     Add-AzureSMVmToRM -VM <PersistentVMRoleContext> -ResourceGroupName <String> -DiskAction <Object> -KeyVaultResourceName <String> -KeyVaultVaultName <String> -CertificatesToInstall 
-    <String[]> [-WinRmCertificateName <String>] -OutputFileFolder <String> [-AppendTimeStampForFiles] -Deploy [<CommonParameters>]
+    <String[]> -WinRmCertificateName <String> -OutputFileFolder <String> [-AppendTimeStampForFiles] -Deploy [<CommonParameters>]
 .EXAMPLE  
     Only generate files for a VM with custom certificates    
     Add-AzureSMVmToRM -VM <PersistentVMRoleContext> -ResourceGroupName <String> -DiskAction <Object> -KeyVaultResourceName <String> -KeyVaultVaultName <String> -CertificatesToInstall 
-    <String[]> [-WinRmCertificateName <String>] -OutputFileFolder <String> [-AppendTimeStampForFiles] [<CommonParameters>]
+    <String[]> -WinRmCertificateName <String> -OutputFileFolder <String> [-AppendTimeStampForFiles] [<CommonParameters>]
 .EXAMPLE    
     Deploy a VM with custom certificates, but not generate files  
     Add-AzureSMVmToRM -VM <PersistentVMRoleContext> -ResourceGroupName <String> -DiskAction <Object> -KeyVaultResourceName <String> -KeyVaultVaultName <String> -CertificatesToInstall 
-    <String[]> [-WinRmCertificateName <String>] -Deploy [<CommonParameters>]
+    <String[]> -WinRmCertificateName <String> -Deploy [<CommonParameters>]
 .EXAMPLE    
     Add-AzureSMVmToRM -VM <PersistentVMRoleContext> -ResourceGroupName <String> -DiskAction <Object> -OutputFileFolder <String> [-AppendTimeStampForFiles] -Deploy [<CommonParameters>]
 #>
