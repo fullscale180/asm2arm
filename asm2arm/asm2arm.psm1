@@ -169,6 +169,13 @@ function Add-AzureSMVmToRM
         [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated and deploy')]
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
+        [ValidateScript({
+            if ($WinRmCertificateName -and -not $_.Contains($WinRmCertificateName)) 
+            {
+                return $false
+            }
+            return $true
+        })]
         [string[]]
         $CertificatesToInstall,
 
@@ -183,7 +190,7 @@ function Add-AzureSMVmToRM
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
         [ValidateScript({
-            if ($_ -and (-not $CertificatesToInstall -or -not $CertificatesToInstall.Contains($_)))
+            if ($_ -and $CertificatesToInstall -and -not $CertificatesToInstall.Contains($_)) 
             {
                 return $false
             }
