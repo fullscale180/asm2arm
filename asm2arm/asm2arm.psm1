@@ -169,6 +169,13 @@ function Add-AzureSMVmToRM
         [Parameter(Mandatory=$true, ParameterSetName='VM object with custom certificate with files generated and deploy')]
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
+        [ValidateScript({
+            if ($WinRmCertificateName -and -not $_.Contains($WinRmCertificateName)) 
+            {
+                return $false
+            }
+            return $true
+        })]
         [string[]]
         $CertificatesToInstall,
 
@@ -183,7 +190,7 @@ function Add-AzureSMVmToRM
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
         [ValidateScript({
-            if ($_ -and (-not $CertificatesToInstall -or -not $CertificatesToInstall.Contains($_)))
+            if ($_ -and $CertificatesToInstall -and -not $CertificatesToInstall.Contains($_)) 
             {
                 return $false
             }
@@ -285,7 +292,7 @@ function Add-AzureSMVmToRM
     $actualParameters = @{}
 
     $parametersObject.Add('location', $(New-ArmTemplateParameter -Type "string" -Description "location where the resources are going to be deployed to" `
-                                            -AllowedValues @("East US", "West US", "West Europe", "East Asia", "South East Asia", "East US 2", "Central US", "South Central US", "North Europe", "Japan East", "Japan West", "North Central US"))) 
+                                            -AllowedValues @("East US", "West US", "West Europe", "East Asia", "South East Asia"))) 
     $actualParameters.Add('location', '')
     
     # Compose an expression that allows capturing the resource location from ARM template parameters
