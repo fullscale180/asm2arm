@@ -746,19 +746,26 @@ function Start-HyperbolicWaitForStorageAccount
         $done = $storageAccount -ne $null
         if (-not $done)
         {
-            Write-Verbose ("Waiting for {0} seconds for the storage account {1} to be created. This is try unmber {2}" -f $waitFor, $storageAccount, $iteration)
+            Write-Verbose ("Waiting for {0} seconds for the storage account {1} to be created. This is try number {2}" -f $waitFor, $StorageAccountName, $iteration)
             Start-Sleep -Seconds $waitFor
-            $waitFor = $startSeconds / $iteration
-            if ($iteration -le 10)
+            
+            if ($iteration -gt 10)
             {
-                $iteration += 1
+                # only check for every 2 seconds after 10 tries
+                $waitFor = 2
             }
+            else 
+            {
+                $waitFor = $startSeconds / $iteration
+            }
+            $iteration += 1
         }
         
     } while ($iteration -le 100 -and -not $done)
 
     if (-not $done)
     {
-        throw "Storage account {0} on resource group {1} was not available in the allocated time" -f $StorageAccountName, $resourceGroupName
+        $message = "Storage account {0} on resource group {1} was not available in the allocated time" -f $StorageAccountName, $resourceGroupName
+        throw $message
     }
 }
