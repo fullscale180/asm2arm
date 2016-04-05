@@ -450,7 +450,7 @@ function New-VmExtensionResources
             $latestExtension = $armExtensions | sort @{Expression={$_.Version}; Ascending=$false} | Select-Object -first 1
 
             # Normalize the version number so that only major and minor components are present
-            $latestVersion = $latestExtension.Version.Replace('.0.0', '')
+            $latestVersion = $latestExtension.Version -replace '\.\d+\.\d+$', ''
 
             # Compose imperative script line for each extension
             $protectedSettingsString = ''
