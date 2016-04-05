@@ -35,7 +35,7 @@ How to use it?
 -----------------
 1. Start with bringing in the code with "git clone https://github.com/fullscale180/asm2arm.git"
 2. Open an Microsoft Azure PowerShell window and run "Import-Module .\asm2arm.psd1" to import the module.
-3. Run Add-AzureAccount to connect to your Service Management subscription, and Login-LoginAzureRmAccount
+3. Run Add-AzureAccount to connect to your Service Management subscription and run Login-AzureRmAccount to login for ARM
 4. Make sure default subscriptions are selected using Select-AzureSubscription for ASM and Select-AzureRmSubscription for ARM
 5. Either bring in a VM with Get-AzureVm, or directly use ServiceName & Name combination to give the VM to the Add-AzureSMVmToRM cmdlet. 
  
