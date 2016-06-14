@@ -298,7 +298,7 @@ function Add-AzureSMVmToRM
     $actualParameters = @{}
 
 	$parametersObject.Add('location', $(New-ArmTemplateParameter -Type "string" -Description "location where the resources are going to be deployed to" `
-                                            -AllowedValues @("East US", "West US", "West Europe", "East Asia", "South East Asia", "East US 2", "Central US", "South Central US", "North Europe", "Japan East", "Japan West", "North Central US"))) 
+                                            -AllowedValues @("East US", "West US", "West Europe", "East Asia", "SouthEast Asia", "East US 2", "Central US", "South Central US", "North Europe", "Japan East", "Japan West", "North Central US"))) 
     $actualParameters.Add('location', '')
     
     # Compose an expression that allows capturing the resource location from ARM template parameters
