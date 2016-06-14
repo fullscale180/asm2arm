@@ -306,7 +306,7 @@ function Add-AzureSMVmToRM
 
     if ($DiskAction -eq 'NewDisks')
     {
-        $credentials = Get-Credential
+        $credentials = Get-Credential -Message "VM administrator details"
         $parametersObject.Add('adminUser', $(New-ArmTemplateParameter -Type "string" -Description "Administrator user name")) 
         $actualParameters.Add('adminUser', $credentials.UserName)
 
@@ -499,17 +499,27 @@ function Add-AzureSMVmToRM
     $publicIPAddressResource = New-PublicIpAddressResource -Name $ipAddressName -Location $resourceLocation `
         -AllocationMethod 'Dynamic' -DnsName $armDnsName
     $resources += $publicIPAddressResource
+
+    # Network Security Group resource
+    $nsgName = '{0}_nsg' -f $vmName
+    $nsgResource = New-NetworkSecurityGroupResource -Name $nsgName -Location $resourceLocation -VM $VM
+    $resources += $nsgResource
     
     # NIC resource
     $nicName = '{0}_nic' -f $vmName
     $subnetRef = '[concat(resourceId(''Microsoft.Network/virtualNetworks'',''{0}''),''/subnets/{1}'')]' -f $vnetName, $vmSubnetName
+    $nsgRef = '[resourceId(''Microsoft.Network/networkSecurityGroups'',''{0}'')]' -f $nsgName
+
     $ipAddressDependency = 'Microsoft.Network/publicIPAddresses/{0}' -f $ipAddressName
     $vnetDependency = 'Microsoft.Network/virtualNetworks/{0}' -f $vnetName
+    $nsgDependency = 'Microsoft.Network/networkSecurityGroups/{0}' -f $nsgName
 
     Write-Verbose $("Adding a resource definition for '{0}' network interface" -f $nicName)
 
-    $dependencies = @($ipAddressDependency)
-    $nicResource = New-NetworkInterfaceResource -Name $nicName -Location $resourceLocation -PublicIpAddressName $ipAddressName -PrivateIpAddress $privateIpAddress -SubnetReference $subnetRef -Dependencies $dependencies
+    $dependencies = @($ipAddressDependency, $nsgDependency)
+
+    $nicResource = New-NetworkInterfaceResource -Name $nicName -Location $resourceLocation -PublicIpAddressName $ipAddressName `
+        -PrivateIpAddress $privateIpAddress -SubnetReference $subnetRef -NsgReference $nsgRef -Dependencies $dependencies 
     $resources += $nicResource
 
     # VM
